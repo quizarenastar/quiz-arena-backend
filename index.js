@@ -32,6 +32,26 @@ const limiter = rateLimit({
 });
 app.use(limiter); // Apply to all requests
 
+// Request logging middleware
+app.use((req, res, next) => {
+    const start = Date.now();
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        logger.info('HTTP Request', {
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode,
+            ip,
+            userAgent: req.headers['user-agent'],
+            duration: `${duration}ms`,
+        });
+    });
+
+    next();
+});
+
 app.get('/', (req, res) => {
     res.send('Quiz Arena Backend is running');
 });
