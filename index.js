@@ -5,7 +5,7 @@ const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./utils/logger');
-const { PORT, MONGODB_URI } = require('./configs');
+const { MONGODB_URI } = require('./configs');
 const userRoutes = require('./routes/main/userRoutes');
 const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
 
@@ -81,6 +81,6 @@ app.use((err, req, res, next) => {
     res.status(statusCode).json({ success: false, message });
 });
 
-app.listen(PORT, () => {
-    logger.info(`Server is running on http://localhost:${PORT}`);
+app.listen(5000, () => {
+    logger.info(`Server is running on http://localhost:5000`);
 });
