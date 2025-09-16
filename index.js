@@ -2,6 +2,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const { PORT, MONGODB_URI } = require('./configs');
@@ -10,6 +11,7 @@ const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 // Connect to MongoDB
 async function main() {
