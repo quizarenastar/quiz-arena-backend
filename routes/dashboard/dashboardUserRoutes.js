@@ -4,6 +4,7 @@ const {
     signUp,
     signIn,
     getAllDashboardUsers,
+    getAllUsers,
 } = require('../../controllers/dashboard/dashboardUserController');
 const { validate } = require('../../middlewares/validate');
 const {
@@ -17,6 +18,7 @@ const {
 
 router.post('/signup', validate(dashboardUserSchemaSignup), signUp);
 router.post('/login', validate(dashboardUserSchemaLogin), signIn);
+
 router.get(
     '/dashboardUserlist',
     verifyDashboardUser,
@@ -27,7 +29,7 @@ router.get(
     '/userlist',
     verifyDashboardUser,
     requireRole(['Admin']),
-    getAllDashboardUsers
+    getAllUsers
 );
 
 module.exports = router;
