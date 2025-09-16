@@ -1,12 +1,64 @@
+const dotenv = require('dotenv');
+dotenv.config();
 const express = require('express');
+const rateLimit = require('express-rate-limit');
+const mongoose = require('mongoose');
+const logger = require('./utils/logger');
+const { PORT, MONGODB_URI } = require('./configs');
+const userRoutes = require('./routes/main/userRoutes');
+const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+app.use(express.json());
+
+// Connect to MongoDB
+async function main() {
+    try {
+        await mongoose.connect(MONGODB_URI);
+        logger.info('Connected to DB');
+    } catch (err) {
+        logger.error('Failed to connect to DB', { error: err });
+    }
+}
+main();
+
+// Rate limiter middleware
+const limiter = rateLimit({
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+});
+app.use(limiter); // Apply to all requests
 
 app.get('/', (req, res) => {
     res.send('Quiz Arena Backend is running');
 });
 
+app.use('/api/v1/users', userRoutes);
+app.use('/dashboard/v1/users', dashboardUserRoutes);
+
+// 404 handler (Express 5: use a regex-style catch-all)
+app.use((req, res, next) => {
+    res.status(404).json({
+        success: false,
+        message: 'Route not found',
+    });
+});
+
+// Centralized error handler with logging
+app.use((err, req, res, next) => {
+    const statusCode = err.status || err.statusCode || 500;
+    const message = err.message || 'Internal Server Error';
+    logger.error('Request failed', {
+        method: req.method,
+        url: req.originalUrl,
+        statusCode,
+        message,
+        stack: err.stack,
+    });
+    res.status(statusCode).json({ success: false, message });
+});
+
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+    logger.info(`Server is running on http://localhost:${PORT}`);
 });
