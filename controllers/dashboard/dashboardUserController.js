@@ -85,11 +85,19 @@ module.exports.signIn = async (req, res, next) => {
 };
 
 module.exports.getAllDashboardUsers = async (req, res) => {
-    const allUsers = DashboardUser.find();
-    sendSuccess(res, allUsers, 'All User Of Dashboard');
+    try {
+        const allUsers = await DashboardUser.find();
+        sendSuccess(res, allUsers, 'All Dashboard Users');
+    } catch (err) {
+        sendError(res, 'Failed to fetch dashboard users', 500);
+    }
 };
 
 module.exports.getAllUsers = async (req, res) => {
-    const allUsers = User.find();
-    sendSuccess(res, allUsers, 'All Users');
+    try {
+        const allUsers = await User.find();
+        sendSuccess(res, allUsers, 'All Users');
+    } catch (err) {
+        sendError(res, 'Failed to fetch users', 500);
+    }
 };
