@@ -83,3 +83,13 @@ module.exports.signIn = async (req, res, next) => {
 
     sendSuccess(res, { token, role: user.role }, 'Login successful');
 };
+
+module.exports.getAllDashboardUsers = async (req, res) => {
+    const allUsers = DashboardUser.find();
+    sendSuccess(res, allUsers, 'All User Of Dashboard');
+};
+
+module.exports.getAllUsers = async (req, res) => {
+    const allUsers = User.find();
+    sendSuccess(res, allUsers, 'All Users');
+};
