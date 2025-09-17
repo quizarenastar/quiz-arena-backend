@@ -74,10 +74,6 @@ module.exports.signin = async (req, res) => {
 };
 
 module.exports.google = async (req, res) => {
-    console.log(expiryDate);
-    console.log(JWT_SECRET);
-    console.log(req.body);
-
     const { email, name } = req.body;
 
     let user = await Client.findOne({ email });

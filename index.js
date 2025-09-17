@@ -8,6 +8,7 @@ const logger = require('./utils/logger');
 const { MONGODB_URI } = require('./configs');
 const userRoutes = require('./routes/main/userRoutes');
 const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
+const contactRoutes = require('./routes/main/contactRoutes');
 
 const app = express();
 app.use(express.json());
@@ -68,8 +69,13 @@ app.get('/', (req, res) => {
     res.send('Quiz Arena Backend is running');
 });
 
+// Main routes
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/contact', contactRoutes);
+
+// Dashboard routes
 app.use('/dashboard/v1/users', dashboardUserRoutes);
+app.use('/dashboard/v1/contact', contactRoutes);
 
 // 404 handler (Express 5: use a regex-style catch-all)
 app.use((req, res, next) => {
