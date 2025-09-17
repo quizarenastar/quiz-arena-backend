@@ -4,6 +4,7 @@ const {
     verifyDashboardUser,
     requireRole,
 } = require('../../middlewares/verifyDashboardUser');
+const contactController = require('../../controllers/dashboard/contactController');
 
 // Admin routes - Protected by dashboard user verification
 router.get(

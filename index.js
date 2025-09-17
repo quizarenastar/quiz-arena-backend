@@ -6,9 +6,14 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const { MONGODB_URI } = require('./configs');
+
+//main imports
 const userRoutes = require('./routes/main/userRoutes');
-const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
 const contactRoutes = require('./routes/main/contactRoutes');
+
+//dashboard imports
+const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
+const dashboardContactRoutes = require('./routes/dashboard/contactRoutes');
 
 const app = express();
 app.use(express.json());
@@ -75,7 +80,7 @@ app.use('/api/v1/contact', contactRoutes);
 
 // Dashboard routes
 app.use('/dashboard/v1/users', dashboardUserRoutes);
-app.use('/dashboard/v1/contact', contactRoutes);
+app.use('/dashboard/v1/contact', dashboardContactRoutes);
 
 // 404 handler (Express 5: use a regex-style catch-all)
 app.use((req, res, next) => {
