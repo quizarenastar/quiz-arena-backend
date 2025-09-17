@@ -4,6 +4,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'admin123';
 const MODERATOR_SECRET = process.env.MODERATOR_SECRET || 'mod123';
 const MANAGER_SECRET = process.env.MANAGER_SECRET || 'manager123';
+const expiryDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
 module.exports = {
     JWT_SECRET,
@@ -12,4 +13,5 @@ module.exports = {
     ADMIN_SECRET,
     MODERATOR_SECRET,
     MANAGER_SECRET,
+    expiryDate,
 };

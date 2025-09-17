@@ -31,7 +31,7 @@ const userSchema = new mongoose.Schema(
         },
         totalRedeem: {
             type: Number,
-            default: 20,
+            default: 0,
         },
         currentBalance: {
             type: Number,

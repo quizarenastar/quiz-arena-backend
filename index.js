@@ -11,7 +11,19 @@ const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+const corsOptions = {
+    origin: [
+        'http://localhost:5001',
+        'http://localhost:5002',
+        'https://quizarena.in',
+        'https://dashboard.quizarena.in',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
 
 // Connect to MongoDB
 async function main() {
