@@ -1,4 +1,5 @@
 const DashboardUser = require('../../models/DashboardUser');
+const User = require('../../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendError, sendSuccess } = require('../../utils/sendResponse');
