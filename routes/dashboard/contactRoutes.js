@@ -10,13 +10,13 @@ const contactController = require('../../controllers/dashboard/contactController
 router.get(
     '/',
     verifyDashboardUser,
-    requireRole(['admin', 'manager', 'moderator']),
+    // requireRole(['admin', 'manager', 'moderator']),
     contactController.getAllContacts
 );
 router.patch(
     '/:id/status',
     verifyDashboardUser,
-    requireRole(['admin', 'manager', 'moderator']),
+    // requireRole(['admin', 'manager', 'moderator']),
     contactController.updateContactStatus
 );
 

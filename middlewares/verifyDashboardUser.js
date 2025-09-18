@@ -11,6 +11,7 @@ module.exports.verifyDashboardUser = (req, res, next) => {
     jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
         if (err) {
             sendError(res, 'Unauthorized', 401);
+            return;
         }
 
         req.user = decoded;
@@ -26,6 +27,7 @@ module.exports.requireRole = (roles) => {
                 'You do not have permission to perform this action',
                 403
             );
+            return;
         }
         next();
     };
