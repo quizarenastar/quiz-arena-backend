@@ -34,15 +34,21 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Connect to MongoDB
 async function main() {
     try {
         await mongoose.connect(MONGODB_URI);
-        logger.info('Connected to DB');
+        logger.info('✅ Connected to DB');
+
+        // Start the server *after* successful DB connection
+        app.listen(5000, () => {
+            logger.info(`🚀 Server is running on http://localhost:5000`);
+        });
     } catch (err) {
-        logger.error('Failed to connect to DB', { error: err });
+        logger.error('❌ Failed to connect to DB', { error: err });
+        process.exit(1); // Exit
     }
 }
+
 main();
 
 // Rate limiter middleware
