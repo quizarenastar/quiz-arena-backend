@@ -7,17 +7,6 @@ const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const { MONGODB_URI } = require('./configs');
 
-//main imports
-const userRoutes = require('./routes/main/userRoutes');
-const contactRoutes = require('./routes/main/contactRoutes');
-const quizRoutes = require('./routes/main/quizRoutes');
-const walletRoutes = require('./routes/main/walletRoutes');
-
-//dashboard imports
-const dashboardUserRoutes = require('./routes/dashboard/dashboardUserRoutes');
-const dashboardContactRoutes = require('./routes/dashboard/contactRoutes');
-const adminRoutes = require('./routes/dashboard/adminRoutes');
-
 const app = express();
 app.use(express.json());
 const corsOptions = {
@@ -84,15 +73,20 @@ app.get('/', (req, res) => {
 });
 
 // Main routes
-app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/contact', contactRoutes);
-app.use('/api/v1/quizzes', quizRoutes);
-app.use('/api/v1/wallet', walletRoutes);
+app.use('/api/v1/users', require('./routes/main/userRoutes'));
+app.use('/api/v1/contact', require('./routes/main/contactRoutes'));
+app.use('/api/v1/quizzes', require('./routes/main/quizRoutes'));
+app.use('/api/v1/wallet', require('./routes/main/walletRoutes'));
 
 // Dashboard routes
-app.use('/dashboard/v1/users', dashboardUserRoutes);
-app.use('/dashboard/v1/contact', dashboardContactRoutes);
-app.use('/dashboard/v1/admin', adminRoutes);
+app.use(
+    '/dashboard/v1/users',
+    require('./routes/dashboard/dashboardUserRoutes')
+);
+app.use('/dashboard/v1/contact', require('./routes/dashboard/contactRoutes'));
+app.use('/dashboard/v1/stats', require('./routes/dashboard/statsRoutes'));
+app.use('/dashboard/v1/quizzes', require('./routes/dashboard/quizRoutes'));
+app.use('/dashboard/v1/wallet', require('./routes/dashboard/walletRoutes'));
 
 // 404 handler (Express 5: use a regex-style catch-all)
 app.use((req, res, next) => {

@@ -1,10 +1,10 @@
-const Quiz = require('../models/Quiz');
-const Question = require('../models/Question');
-const QuizAttempt = require('../models/QuizAttempt');
-const User = require('../models/User');
-const Transaction = require('../models/Transaction');
-const AIService = require('../services/aiService');
-const AntiCheatService = require('../services/antiCheatService');
+const Quiz = require('../../models/Quiz');
+const Question = require('../../models/Question');
+const QuizAttempt = require('../../models/QuizAttempt');
+const User = require('../../models/User');
+const Transaction = require('../../models/Transaction');
+const AIService = require('../../services/aiService');
+const AntiCheatService = require('../../services/antiCheatService');
 const mongoose = require('mongoose');
 
 class QuizController {

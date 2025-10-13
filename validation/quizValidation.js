@@ -207,31 +207,6 @@ exports.violationSchema = Joi.object({
     timestamp: Joi.date().iso().optional(),
 });
 
-// Wallet operations schemas
-exports.addFundsSchema = Joi.object({
-    amount: Joi.number().min(0.01).max(1000).required(),
-    paymentMethod: Joi.string().optional(),
-});
-
-exports.withdrawalSchema = Joi.object({
-    amount: Joi.number().min(10).required(),
-    withdrawalMethod: Joi.string().optional(),
-    accountDetails: Joi.string().max(500).required(),
-});
-
-exports.refundSchema = Joi.object({
-    reason: Joi.string().max(200).required(),
-});
-
-// Parameter validation schemas
-exports.mongoIdSchema = Joi.string().pattern(/^[0-9a-fA-F]{24}$/);
-
-// Query validation schemas
-exports.paginationSchema = Joi.object({
-    page: Joi.number().integer().min(1).optional(),
-    limit: Joi.number().integer().min(1).max(100).optional(),
-});
-
 exports.quizFilterSchema = Joi.object({
     category: Joi.string()
         .valid(...validCategories)
@@ -245,16 +220,26 @@ exports.quizFilterSchema = Joi.object({
     limit: Joi.number().integer().min(1).max(100).optional(),
 });
 
+// Wallet transaction filter schema
 exports.transactionFilterSchema = Joi.object({
-    type: Joi.string()
-        .valid('payment', 'earning', 'withdrawal', 'refund', 'all')
-        .optional(),
-    startDate: Joi.date().iso().optional(),
-    endDate: Joi.date().iso().optional(),
     page: Joi.number().integer().min(1).optional(),
     limit: Joi.number().integer().min(1).max(100).optional(),
+    type: Joi.string()
+        .valid(
+            'payment',
+            'earning',
+            'refund',
+            'withdrawal',
+            'bonus',
+            'penalty',
+            'all'
+        )
+        .optional(),
+    startDate: Joi.date().optional(),
+    endDate: Joi.date().optional(),
 });
 
+// Earnings query schema
 exports.earningsQuerySchema = Joi.object({
-    period: Joi.number().integer().min(1).max(365).optional(),
+    period: Joi.number().integer().min(1).max(365).default(30),
 });

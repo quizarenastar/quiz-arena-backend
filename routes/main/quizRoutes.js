@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const quizController = require('../../controllers/quizController');
+const quizController = require('../../controllers/main/quizController');
 const {
     createQuizSchema,
     updateQuizSchema,

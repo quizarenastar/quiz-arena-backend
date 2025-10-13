@@ -129,6 +129,9 @@ const transactionSchema = new mongoose.Schema(
                 type: String,
             },
         },
+        reasonForRejection: {
+            type: String,
+        },
         tax: {
             taxAmount: {
                 type: Number,

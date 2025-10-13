@@ -1,18 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const walletController = require('../../controllers/walletController');
+const walletController = require('../../controllers/main/walletController');
 const {
     addFundsSchema,
     withdrawalSchema,
-    refundSchema,
     transactionFilterSchema,
     earningsQuerySchema,
-} = require('../../validation/quizValidation');
-const {
-    validateBody,
-    validateQuery,
-    validateMongoId,
-} = require('../../middlewares/validate');
+} = require('../../validation/walletSchema');
+const { validateBody, validateQuery } = require('../../middlewares/validate');
 const verifyUser = require('../../middlewares/verifyUser');
 const rateLimit = require('express-rate-limit');
 
@@ -77,20 +72,6 @@ router.get(
     '/earnings',
     validateQuery(earningsQuerySchema),
     walletController.getEarningsSummary
-);
-
-// Admin only routes
-const {
-    verifyDashboardUser,
-} = require('../../middlewares/verifyDashboardUser');
-
-// POST /api/wallet/refund/:transactionId - Process refund (admin only)
-router.post(
-    '/refund/:transactionId',
-    verifyDashboardUser,
-    validateMongoId('transactionId'),
-    validateBody(refundSchema),
-    walletController.processRefund
 );
 
 module.exports = router;
