@@ -13,10 +13,11 @@ const {
 const { adminFilterSchema } = require('../../validation/commonValidations');
 
 const {
-    approveRejectSchema,
     deleteQuizSchema,
     cancelQuizSchema,
 } = require('../../validation/quizValidation');
+
+const { approveRejectSchema } = require('../../validation/commonValidations');
 
 // Admin authentication middleware
 router.use(verifyDashboardUser);
