@@ -2,8 +2,46 @@ const Quiz = require('../../models/Quiz');
 const User = require('../../models/User');
 const QuizAttempt = require('../../models/QuizAttempt');
 const Transaction = require('../../models/Transaction');
+const DashboardUser = require('../../models/DashboardUser');
+const Contact = require('../../models/Contact');
 
 class StatsController {
+    // Get dashboard counts for stats cards
+    async getDashboardCounts(req, res) {
+        try {
+            const [
+                quizzesCount,
+                usersCount,
+                dashboardUsersCount,
+                transactionsCount,
+                contactsCount,
+            ] = await Promise.all([
+                Quiz.countDocuments(),
+                User.countDocuments(),
+                DashboardUser.countDocuments(),
+                Transaction.countDocuments(),
+                Contact.countDocuments(),
+            ]);
+
+            res.json({
+                success: true,
+                data: {
+                    quizzes: quizzesCount,
+                    users: usersCount,
+                    dashboardUsers: dashboardUsersCount,
+                    walletTransactions: transactionsCount,
+                    contacts: contactsCount,
+                },
+            });
+        } catch (error) {
+            console.error('Get dashboard counts error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to fetch dashboard counts',
+            });
+        }
+    }
+
     // Get dashboard statistics
     async getDashboardStats(req, res) {
         try {

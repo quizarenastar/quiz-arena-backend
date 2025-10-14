@@ -11,14 +11,13 @@ const { adminFilterSchema } = require('../../validation/commonValidations');
 // Admin authentication middleware
 router.use(verifyDashboardUser);
 
+// Dashboard counts for stats cards
+router.get('/counts', statsController.getDashboardCounts);
+
 // Dashboard statistics
-router.get('/stats', statsController.getDashboardStats);
+router.get('/', statsController.getDashboardStats);
 
 // Analytics routes
-router.get(
-    '/analytics/quiz',
-    validateQuery(adminFilterSchema),
-    statsController.getQuizAnalytics
-);
+router.get('/analytics/quiz', statsController.getQuizAnalytics);
 
 module.exports = router;
