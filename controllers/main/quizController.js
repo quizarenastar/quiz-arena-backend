@@ -463,7 +463,7 @@ class QuizController {
                 data: {
                     attemptId: attempt._id,
                     questions,
-                    timeLimit: quiz.duration * 60 * 1000, // Convert to milliseconds
+                    timeLimit: quiz.duration * 1000, // Total quiz time in milliseconds (duration is now in seconds)
                     settings: quiz.settings,
                 },
                 message: 'Quiz attempt started',

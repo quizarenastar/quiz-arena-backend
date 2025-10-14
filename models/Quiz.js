@@ -48,7 +48,7 @@ const quizSchema = new mongoose.Schema(
         duration: {
             type: Number,
             required: true,
-            min: 1, // minutes
+            min: 10, // seconds (minimum 10 seconds)
         },
         totalQuestions: {
             type: Number,
