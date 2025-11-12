@@ -32,14 +32,6 @@ class QuizController {
                 visibility,
             } = req.body;
 
-            if (numQuestions > 50) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        'AI generation limit exceeded. Max 50 questions allowed.',
-                });
-            }
-
             const userId = req.userId;
 
             // Map field names to match model
@@ -1178,21 +1170,6 @@ class QuizController {
             const { quizId } = req.params;
             const userId = req.userId;
             const { count, difficulty, topic, category } = req.body;
-
-            if (!count || count <= 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Count must be a positive integer',
-                });
-            }
-
-            if (count > 50) {
-                return res.status(400).json({
-                    success: false,
-                    message:
-                        'AI generation limit exceeded. Max 50 questions allowed.',
-                });
-            }
 
             const quiz = await Quiz.findOne({ _id: quizId, creatorId: userId });
             if (!quiz) {
