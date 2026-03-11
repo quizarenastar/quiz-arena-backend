@@ -162,6 +162,116 @@ const quizSchema = new mongoose.Schema(
             enum: ['public', 'private', 'unlisted'],
             default: 'public',
         },
+        // Participant Management for Prize Pool System
+        participantManagement: {
+            requiresRegistration: {
+                type: Boolean,
+                default: function () {
+                    return this.isPaid; // Paid quizzes require registration
+                },
+            },
+            registeredUsers: [
+                {
+                    userId: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: 'User',
+                    },
+                    registeredAt: {
+                        type: Date,
+                        default: Date.now,
+                    },
+                    status: {
+                        type: String,
+                        enum: ['registered', 'paid', 'refunded'],
+                        default: 'paid', // Payment held in escrow
+                    },
+                    paymentId: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: 'Transaction',
+                    },
+                },
+            ],
+            participantCount: {
+                type: Number,
+                default: 0,
+            },
+            minParticipants: {
+                type: Number,
+                default: 5, // Minimum 5 for paid quizzes
+            },
+        },
+        // Prize Pool Management
+        prizePool: {
+            totalAmount: {
+                type: Number,
+                default: 0,
+            },
+            platformFee: {
+                type: Number,
+                default: 0, // 20% of total
+            },
+            creatorFee: {
+                type: Number,
+                default: 0, // 30% of total
+            },
+            prizeMoney: {
+                type: Number,
+                default: 0, // 50% of total
+            },
+            distributed: {
+                type: Boolean,
+                default: false,
+            },
+            distributedAt: {
+                type: Date,
+            },
+            winners: [
+                {
+                    userId: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: 'User',
+                    },
+                    rank: {
+                        type: Number,
+                    },
+                    prize: {
+                        type: Number,
+                    },
+                    attemptId: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: 'QuizAttempt',
+                    },
+                    transactionId: {
+                        type: mongoose.Schema.Types.ObjectId,
+                        ref: 'Transaction',
+                    },
+                },
+            ],
+        },
+        // Auto-Cancellation Tracking
+        autoCancel: {
+            checked: {
+                type: Boolean,
+                default: false,
+            },
+            checkedAt: {
+                type: Date,
+            },
+            isCancelled: {
+                type: Boolean,
+                default: false,
+            },
+            cancelReason: {
+                type: String,
+            },
+            refundsProcessed: {
+                type: Boolean,
+                default: false,
+            },
+            refundedAt: {
+                type: Date,
+            },
+        },
         cancelledAt: {
             type: Date,
         },
@@ -173,7 +283,7 @@ const quizSchema = new mongoose.Schema(
             type: String,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
 // Virtual to check if quiz is active based on timing
@@ -204,6 +314,9 @@ quizSchema.index({ status: 1, createdAt: -1 });
 quizSchema.index({ topic: 1, difficulty: 1 });
 quizSchema.index({ isPaid: 1, price: 1 });
 quizSchema.index({ category: 1, visibility: 1 });
+// Index for scheduled task optimization (auto-cancel and prize distribution)
+quizSchema.index({ startTime: 1, status: 1 });
+quizSchema.index({ endTime: 1, status: 1, 'prizePool.distributed': 1 });
 
 const Quiz = mongoose.model('Quiz', quizSchema);
 

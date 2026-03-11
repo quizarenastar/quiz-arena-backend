@@ -28,6 +28,11 @@ async function main() {
         await mongoose.connect(MONGODB_URI);
         logger.info('✅ Connected to DB');
 
+        // Initialize cron scheduler for prize pool automation
+        const cronScheduler = require('./services/cronScheduler');
+        cronScheduler.startAll();
+        logger.info('✅ Cron scheduler started');
+
         // Start the server *after* successful DB connection
         app.listen(5000, () => {
             logger.info(`🚀 Server is running on http://localhost:5000`);
@@ -43,7 +48,7 @@ main();
 // Rate limiter middleware
 const limiter = rateLimit({
     windowMs: 10 * 60 * 1000, // 10 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: 1000, // limit each IP to 100 requests per windowMs
     message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter); // Apply to all requests
@@ -81,7 +86,7 @@ app.use('/api/v1/wallet', require('./routes/main/walletRoutes'));
 // Dashboard routes
 app.use(
     '/dashboard/v1/users',
-    require('./routes/dashboard/dashboardUserRoutes')
+    require('./routes/dashboard/dashboardUserRoutes'),
 );
 app.use('/dashboard/v1/contact', require('./routes/dashboard/contactRoutes'));
 app.use('/dashboard/v1/stats', require('./routes/dashboard/statsRoutes'));

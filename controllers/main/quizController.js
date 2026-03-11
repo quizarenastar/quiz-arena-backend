@@ -5,6 +5,7 @@ const User = require('../../models/User');
 const Transaction = require('../../models/Transaction');
 const AIService = require('../../services/aiService');
 const AntiCheatService = require('../../services/antiCheatService');
+const prizeDistributionService = require('../../services/prizeDistributionService');
 const mongoose = require('mongoose');
 
 class QuizController {
@@ -137,7 +138,7 @@ class QuizController {
                         topic,
                         numQuestions,
                         quizDifficulty,
-                        category
+                        category,
                     );
 
                     // Use suggested category if category wasn't provided
@@ -180,8 +181,8 @@ class QuizController {
                             (difficulty === 'easy'
                                 ? 1
                                 : difficulty === 'medium'
-                                ? 2
-                                : 3),
+                                  ? 2
+                                  : 3),
                         timeLimit: qData.timeLimit || 30,
                         quizId: quiz._id,
                         createdBy: userId,
@@ -338,6 +339,148 @@ class QuizController {
         }
     }
 
+    // Register for paid quiz (escrow payment before quiz starts)
+    async registerForQuiz(req, res) {
+        try {
+            const { quizId } = req.params;
+            const userId = req.userId;
+
+            const quiz = await Quiz.findById(quizId);
+            if (!quiz || quiz.status !== 'approved') {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Quiz not found or not available',
+                });
+            }
+
+            // Only paid quizzes require registration
+            if (!quiz.isPaid) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This is a free quiz, no registration required',
+                });
+            }
+
+            // Check if quiz has been cancelled
+            if (quiz.status === 'cancelled') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'This quiz has been cancelled',
+                });
+            }
+
+            // Check if start time has passed
+            if (quiz.startTime && new Date() >= new Date(quiz.startTime)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Registration is closed, quiz has already started',
+                });
+            }
+
+            // Check if user already registered
+            const alreadyRegistered =
+                quiz.participantManagement.registeredUsers.find(
+                    (reg) => reg.userId.toString() === userId.toString(),
+                );
+            if (alreadyRegistered) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'You are already registered for this quiz',
+                    registration: alreadyRegistered,
+                });
+            }
+
+            // Process payment (held in escrow)
+            const user = await User.findById(userId);
+            if (!user || user.wallet.balance < quiz.price) {
+                return res.status(402).json({
+                    success: false,
+                    message: 'Insufficient wallet balance',
+                    required: quiz.price,
+                    available: user?.wallet.balance || 0,
+                });
+            }
+
+            const session = await mongoose.startSession();
+            let registration = null;
+            let transaction = null;
+
+            await session.withTransaction(async () => {
+                const userBalanceBefore = user.wallet.balance;
+
+                // Deduct amount from wallet (held in escrow)
+                user.wallet.balance -= quiz.price;
+                user.wallet.totalSpent += quiz.price;
+                await user.save({ session });
+
+                // Create transaction record (payment in escrow)
+                transaction = new Transaction({
+                    userId,
+                    type: 'payment',
+                    amount: quiz.price,
+                    description: `Registration for quiz: ${quiz.title}`,
+                    status: 'completed',
+                    relatedQuizId: quizId,
+                    paymentMethod: 'wallet',
+                    balanceBefore: userBalanceBefore,
+                    balanceAfter: user.wallet.balance,
+                    metadata: {
+                        isEscrow: true,
+                        note: 'Payment held until quiz completion or cancellation',
+                    },
+                });
+                await transaction.save({ session });
+
+                // Add user to registered users
+                quiz.participantManagement.registeredUsers.push({
+                    userId: userId,
+                    registeredAt: new Date(),
+                    status: 'paid',
+                    paymentId: transaction._id,
+                });
+
+                // Update participant count
+                quiz.participantManagement.participantCount += 1;
+
+                // Update prize pool total
+                quiz.prizePool.totalAmount =
+                    quiz.participantManagement.participantCount * quiz.price;
+
+                await quiz.save({ session });
+
+                registration =
+                    quiz.participantManagement.registeredUsers[
+                        quiz.participantManagement.registeredUsers.length - 1
+                    ];
+            });
+
+            await session.endSession();
+
+            res.json({
+                success: true,
+                message: 'Successfully registered for quiz',
+                data: {
+                    registration: {
+                        quizId: quiz._id,
+                        quizTitle: quiz.title,
+                        registeredAt: registration.registeredAt,
+                        amount: quiz.price,
+                        startTime: quiz.startTime,
+                        participantCount:
+                            quiz.participantManagement.participantCount,
+                        transactionId: transaction._id,
+                    },
+                },
+            });
+        } catch (error) {
+            console.error('Register for quiz error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to register for quiz',
+            });
+        }
+    }
+
     // Start quiz attempt
     async startAttempt(req, res) {
         try {
@@ -363,78 +506,78 @@ class QuizController {
 
             if (existingAttempt) {
                 const questions = await Question.find({ quizId }).select(
-                    '-correctAnswer -explanation'
+                    '-correctAnswer -explanation',
                 );
+                const timeRemaining =
+                    quiz.duration * 1000 - // duration is in seconds, convert to ms
+                    (Date.now() - existingAttempt.startTime.getTime());
                 return res.json({
                     success: true,
                     data: {
                         attemptId: existingAttempt._id,
                         questions,
-                        timeRemaining:
-                            quiz.duration * 60 * 1000 -
-                            (Date.now() - existingAttempt.startTime.getTime()),
+                        timeLimit: Math.max(timeRemaining, 0), // Use remaining time as timeLimit
+                        timeRemaining: Math.max(timeRemaining, 0),
+                        settings: quiz.settings,
                     },
                     message: 'Resuming existing attempt',
                 });
             }
 
-            // Handle payment for paid quizzes
+            // Handle payment for paid quizzes - CHECK REGISTRATION INSTEAD
             if (quiz.isPaid && quiz.price > 0) {
-                const user = await User.findById(userId);
-                if (!user || user.wallet.balance < quiz.price) {
+                // Check if user is registered (payment already in escrow)
+                const registration =
+                    quiz.participantManagement.registeredUsers.find(
+                        (reg) => reg.userId.toString() === userId.toString(),
+                    );
+
+                if (!registration) {
                     return res.status(402).json({
                         success: false,
-                        message: 'Insufficient wallet balance',
-                        required: quiz.price,
-                        available: user?.wallet.balance || 0,
+                        message:
+                            'You must register for this quiz before starting',
+                        action: 'register_required',
                     });
                 }
 
-                // Start transaction session
-                const session = await mongoose.startSession();
-                await session.withTransaction(async () => {
-                    // Deduct amount from wallet
-                    user.wallet.balance -= quiz.price;
-                    user.wallet.totalSpent += quiz.price;
-                    await user.save({ session });
-
-                    // Create transaction record
-                    const transaction = new Transaction({
-                        userId,
-                        type: 'payment',
-                        amount: quiz.price,
-                        description: `Payment for quiz: ${quiz.title}`,
-                        status: 'completed',
-                        relatedQuizId: quizId,
-                        paymentMethod: 'wallet',
+                if (registration.status === 'refunded') {
+                    return res.status(400).json({
+                        success: false,
+                        message:
+                            'Your registration was refunded (quiz cancelled)',
                     });
-                    await transaction.save({ session });
-
-                    // Credit creator
-                    const creator = await User.findById(quiz.creatorId);
-                    if (creator) {
-                        const creatorEarning = quiz.price * 0.7; // 70% to creator, 30% platform fee
-                        creator.wallet.balance += creatorEarning;
-                        creator.wallet.totalEarned += creatorEarning;
-                        creator.analytics.totalEarnings += creatorEarning;
-                        await creator.save({ session });
-
-                        // Create earning transaction
-                        const earningTransaction = new Transaction({
-                            userId: creator._id,
-                            type: 'earning',
-                            amount: creatorEarning,
-                            description: `Earning from quiz: ${quiz.title}`,
-                            status: 'completed',
-                            relatedQuizId: quizId,
-                            paymentMethod: 'wallet',
-                        });
-                        await earningTransaction.save({ session });
-                    }
-                });
-                await session.endSession();
+                }
             }
 
+            // Check if quiz has a scheduled start time and hasn't started yet
+            if (quiz.startTime) {
+                const now = new Date();
+                const startTime = new Date(quiz.startTime);
+
+                if (now < startTime) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Quiz has not started yet',
+                        startTime: quiz.startTime,
+                        timeRemaining: startTime - now,
+                    });
+                }
+            }
+
+            // Check if quiz has ended
+            if (quiz.endTime) {
+                const now = new Date();
+                const endTime = new Date(quiz.endTime);
+
+                if (now > endTime) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Quiz has ended',
+                        endTime: quiz.endTime,
+                    });
+                }
+            }
             // Create quiz attempt
             const attempt = new QuizAttempt({
                 quizId,
@@ -455,7 +598,7 @@ class QuizController {
 
             // Get questions without correct answers
             const questions = await Question.find({ quizId }).select(
-                '-correctAnswer -explanation'
+                '-correctAnswer -explanation',
             );
 
             res.json({
@@ -499,7 +642,7 @@ class QuizController {
             const updatedAttempt = await AntiCheatService.recordViolation(
                 attemptId,
                 type,
-                details
+                details,
             );
 
             res.json({
@@ -553,7 +696,7 @@ class QuizController {
 
             const processedAnswers = answers.map((answer) => {
                 const question = questions.find(
-                    (q) => q._id.toString() === answer.questionId
+                    (q) => q._id.toString() === answer.questionId,
                 );
                 const isCorrect =
                     question?.correctAnswer === answer.selectedOption;
@@ -610,7 +753,7 @@ class QuizController {
             try {
                 analysis = await AIService.generateQuizAnalysis(
                     attempt,
-                    questions
+                    questions,
                 );
             } catch (analysisError) {
                 console.error('Failed to generate analysis:', analysisError);
@@ -629,7 +772,7 @@ class QuizController {
                     answers: attempt.settings?.showResults
                         ? processedAnswers.map((a) => {
                               const question = questions.find(
-                                  (q) => q._id.toString() === a.questionId
+                                  (q) => q._id.toString() === a.questionId,
                               );
                               return {
                                   ...a,
@@ -769,7 +912,7 @@ class QuizController {
             try {
                 analysis = await AIService.generateQuizAnalysis(
                     attempt,
-                    questions
+                    questions,
                 );
             } catch (analysisError) {
                 console.error('Failed to generate analysis:', analysisError);
@@ -777,7 +920,7 @@ class QuizController {
 
             const detailedAnswers = attempt.answers.map((a) => {
                 const question = questions.find(
-                    (q) => q._id.toString() === a.questionId.toString()
+                    (q) => q._id.toString() === a.questionId.toString(),
                 );
                 return {
                     ...a,
@@ -833,7 +976,7 @@ class QuizController {
                         quizId: quiz._id,
                     });
                     return { ...quiz, questionCount };
-                })
+                }),
             );
 
             res.json({
@@ -909,7 +1052,7 @@ class QuizController {
             const updatedQuiz = await Quiz.findByIdAndUpdate(
                 quizId,
                 filteredUpdates,
-                { new: true, runValidators: true }
+                { new: true, runValidators: true },
             );
 
             res.json({
@@ -1016,8 +1159,8 @@ class QuizController {
                     difficultyLevel === 'easy'
                         ? 1
                         : difficultyLevel === 'medium'
-                        ? 2
-                        : 3,
+                          ? 2
+                          : 3,
             });
 
             await question.save();
@@ -1094,7 +1237,7 @@ class QuizController {
             const updatedQuestion = await Question.findByIdAndUpdate(
                 questionId,
                 filteredUpdates,
-                { new: true, runValidators: true }
+                { new: true, runValidators: true },
             );
 
             res.json({
@@ -1193,7 +1336,7 @@ class QuizController {
                     topic || quiz.topic,
                     count,
                     difficulty || quiz.difficultyLevel,
-                    category || quiz.category
+                    category || quiz.category,
                 );
 
                 const questions = [];
@@ -1260,7 +1403,7 @@ class QuizController {
                 topic,
                 questionCount,
                 questionDifficulty,
-                category
+                category,
             );
 
             // Generate smart title and description

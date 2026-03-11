@@ -14,13 +14,7 @@ const questionSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: [
-                'multiple-choice',
-                'true-false',
-                'fill-blank',
-                'essay',
-                'mcq',
-            ],
+            enum: ['multiple-choice', 'true-false', 'fill-blank', 'essay'],
             default: 'multiple-choice',
         },
         options: [
@@ -116,7 +110,7 @@ const questionSchema = new mongoose.Schema(
             default: true,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
 // Indexes for performance

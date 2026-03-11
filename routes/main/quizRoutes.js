@@ -42,12 +42,12 @@ const quizAttemptLimit = rateLimit({
 router.get(
     '/public',
     validateQuery(quizFilterSchema),
-    quizController.getPublicQuizzes
+    quizController.getPublicQuizzes,
 );
 router.get(
     '/public/:quizId',
     validateMongoId('quizId'),
-    quizController.getQuiz
+    quizController.getQuiz,
 );
 
 // Protected routes (authentication required)
@@ -57,7 +57,7 @@ router.use(verifyUser);
 router.post(
     '/generate-preview',
     validateBody(generateQuestionsSchema),
-    quizController.generateQuestionsPreview
+    quizController.generateQuestionsPreview,
 );
 
 // Quiz management routes
@@ -65,13 +65,13 @@ router.post(
     '/',
     quizCreationLimit,
     validateBody(createQuizSchema),
-    quizController.createQuiz
+    quizController.createQuiz,
 );
 
 router.get(
     '/my-quizzes',
     validateQuery(quizFilterSchema),
-    quizController.getUserQuizzes
+    quizController.getUserQuizzes,
 );
 
 router.get('/:quizId', validateMongoId('quizId'), quizController.getQuiz);
@@ -80,7 +80,7 @@ router.put(
     '/:quizId',
     validateMongoId('quizId'),
     validateBody(updateQuizSchema),
-    quizController.updateQuiz
+    quizController.updateQuiz,
 );
 
 router.delete('/:quizId', validateMongoId('quizId'), quizController.deleteQuiz);
@@ -90,7 +90,7 @@ router.post(
     '/:quizId/questions',
     validateMongoId('quizId'),
     validateBody(addQuestionSchema),
-    quizController.addQuestion
+    quizController.addQuestion,
 );
 
 router.put(
@@ -98,14 +98,14 @@ router.put(
     validateMongoId('quizId'),
     validateMongoId('questionId'),
     validateBody(updateQuestionSchema),
-    quizController.updateQuestion
+    quizController.updateQuestion,
 );
 
 router.delete(
     '/:quizId/questions/:questionId',
     validateMongoId('quizId'),
     validateMongoId('questionId'),
-    quizController.deleteQuestion
+    quizController.deleteQuestion,
 );
 
 // AI question generation
@@ -113,14 +113,22 @@ router.post(
     '/:quizId/generate-questions',
     validateMongoId('quizId'),
     validateBody(generateQuestionsSchema),
-    quizController.generateQuestions
+    quizController.generateQuestions,
 );
 
 // Quiz submission routes
 router.post(
     '/:quizId/submit-approval',
     validateMongoId('quizId'),
-    quizController.submitForApproval
+    quizController.submitForApproval,
+);
+
+// Quiz registration (for paid quizzes)
+router.post(
+    '/:quizId/register',
+    quizAttemptLimit,
+    validateMongoId('quizId'),
+    quizController.registerForQuiz,
 );
 
 // Quiz attempt routes
@@ -128,34 +136,34 @@ router.post(
     '/:quizId/start',
     quizAttemptLimit,
     validateMongoId('quizId'),
-    quizController.startAttempt
+    quizController.startAttempt,
+);
+
+// User attempt history - MUST come before dynamic :attemptId routes
+router.get(
+    '/attempts/my-attempts',
+    validateQuery(quizFilterSchema),
+    quizController.getUserAttempts,
 );
 
 router.post(
     '/attempts/:attemptId/violation',
     validateMongoId('attemptId'),
     validateBody(violationSchema),
-    quizController.recordViolation
+    quizController.recordViolation,
 );
 
 router.post(
     '/attempts/:attemptId/submit',
     validateMongoId('attemptId'),
     validateBody(submitAnswersSchema),
-    quizController.submitAttempt
-);
-
-// User attempt history and analysis
-router.get(
-    '/attempts/my-attempts',
-    validateQuery(quizFilterSchema),
-    quizController.getUserAttempts
+    quizController.submitAttempt,
 );
 
 router.get(
     '/attempts/:attemptId/analysis',
     validateMongoId('attemptId'),
-    quizController.getAttemptAnalysis
+    quizController.getAttemptAnalysis,
 );
 
 module.exports = router;
