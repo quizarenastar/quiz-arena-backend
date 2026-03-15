@@ -192,6 +192,31 @@ class QuizController {
                 }
             }
 
+            // ── AI Auto-Moderation ──────────────────────────────────────────
+            // Run AI review after all questions are saved.
+            // We do this non-awaited so it doesn't delay the API response,
+            // but we still want the result before responding.
+            let aiReview = null;
+            if (questions.length > 0) {
+                try {
+                    aiReview = await AIService.reviewQuizForApproval(quiz, questions);
+                    if (aiReview.approved) {
+                        quiz.status = 'approved';
+                    }
+                    // Store review metadata on quiz (add field if model supports it)
+                    quiz.set('aiReview', {
+                        score: aiReview.score,
+                        reason: aiReview.reason,
+                        reviewedAt: new Date(),
+                    });
+                    await quiz.save();
+                } catch (reviewError) {
+                    console.error('AI moderation step failed:', reviewError);
+                    // Keep status as pending — admin will review manually
+                }
+            }
+            // ────────────────────────────────────────────────────────────────
+
             // Update user analytics
             await User.findByIdAndUpdate(userId, {
                 $inc: { 'analytics.quizzesCreated': 1 },
@@ -202,10 +227,16 @@ class QuizController {
                 data: {
                     quiz,
                     questions,
-                    suggestedCategory, // Include the AI-suggested category for frontend
+                    suggestedCategory,
+                    aiReview: aiReview
+                        ? { approved: aiReview.approved, reason: aiReview.reason, score: aiReview.score }
+                        : null,
                 },
-                message: 'Quiz created successfully',
+                message: aiReview?.approved
+                    ? 'Quiz created and approved automatically ✓'
+                    : 'Quiz created and submitted for review',
             });
+
         } catch (error) {
             console.error('Create quiz error:', error);
             res.status(500).json({
@@ -948,30 +979,37 @@ class QuizController {
             let correctAnswers = 0;
             let totalScore = 0;
 
-            const processedAnswers = answers.map((answer) => {
-                const question = questions.find(
-                    (q) => q._id.toString() === answer.questionId,
-                );
-                const isCorrect =
-                    question?.correctAnswer === answer.selectedOption;
+            if (answers && answers.length > 0) {
+                // Batch-submit flow: process all answers at once
+                const processedAnswers = answers.map((answer) => {
+                    const question = questions.find(
+                        (q) => q._id.toString() === answer.questionId,
+                    );
+                    const isCorrect =
+                        question?.correctAnswer === answer.selectedOption;
 
-                if (isCorrect) {
-                    correctAnswers += 1;
-                    totalScore += question?.points || 1;
-                }
+                    if (isCorrect) {
+                        correctAnswers += 1;
+                        totalScore += question?.points || 1;
+                    }
 
-                return {
-                    questionId: answer.questionId,
-                    selectedOption: answer.selectedOption,
-                    isCorrect,
-                    timeSpent: answer.timeSpent || 0,
-                };
-            });
+                    return {
+                        questionId: answer.questionId,
+                        selectedOption: answer.selectedOption,
+                        isCorrect,
+                        timeSpent: answer.timeSpent || 0,
+                    };
+                });
 
-            // Update attempt
-            attempt.answers = processedAnswers;
-            attempt.correctAnswers = correctAnswers;
-            attempt.score = totalScore;
+                attempt.answers = processedAnswers;
+                attempt.correctAnswers = correctAnswers;
+                attempt.score = totalScore;
+            } else {
+                // One-by-one flow: answers already stored per-question, keep them
+                correctAnswers = attempt.correctAnswers || 0;
+                totalScore = attempt.score || 0;
+            }
+
             attempt.endTime = new Date();
             attempt.duration = Date.now() - attempt.startTime.getTime();
             attempt.status = 'completed';
@@ -1109,6 +1147,17 @@ class QuizController {
                 ];
             }
 
+            // Optional auth — pick userId from header token if present
+            let userId = null;
+            try {
+                const authHeader = req.headers.authorization;
+                if (authHeader && authHeader.startsWith('Bearer ')) {
+                    const jwt = require('jsonwebtoken');
+                    const decoded = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
+                    userId = decoded.userId || decoded.id || decoded._id;
+                }
+            } catch { /* token invalid/absent — stay anonymous */ }
+
             const quizzes = await Quiz.find(filter)
                 .populate('creatorId', 'username')
                 .select('-settings')
@@ -1119,10 +1168,20 @@ class QuizController {
 
             const total = await Quiz.countDocuments(filter);
 
+            // Attach per-quiz isRegistered flag
+            const quizzesWithMeta = quizzes.map((quiz) => {
+                const isRegistered = userId
+                    ? (quiz.participantManagement?.registeredUsers || []).some(
+                          (reg) => reg.userId?.toString() === userId?.toString(),
+                      )
+                    : false;
+                return { ...quiz, isRegistered };
+            });
+
             res.json({
                 success: true,
                 data: {
-                    quizzes,
+                    quizzes: quizzesWithMeta,
                     pagination: {
                         current: page,
                         total: Math.ceil(total / limit),
@@ -1685,6 +1744,76 @@ class QuizController {
                     process.env.NODE_ENV === 'development'
                         ? error.message
                         : undefined,
+            });
+        }
+    }
+    // Get leaderboard for a quiz
+    async getQuizLeaderboard(req, res) {
+        try {
+            const { quizId } = req.params;
+
+            const quiz = await Quiz.findById(quizId).lean();
+            if (!quiz) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Quiz not found',
+                });
+            }
+
+            // Fetch all completed attempts for this quiz
+            const attempts = await QuizAttempt.find({
+                quizId,
+                status: { $in: ['completed', 'auto-submitted'] },
+            })
+                .populate('userId', 'username email')
+                .lean();
+
+            // Sort: highest score first; on tie, lowest duration (fastest) first
+            attempts.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return a.duration - b.duration;
+            });
+
+            // Assign ranks (handle tie ranks)
+            const leaderboard = [];
+            let currentRank = 1;
+            for (let i = 0; i < attempts.length; i++) {
+                if (i > 0) {
+                    const prev = attempts[i - 1];
+                    const curr = attempts[i];
+                    const sameTie = prev.score === curr.score && prev.duration === curr.duration;
+                    if (!sameTie) currentRank = i + 1;
+                }
+                const attempt = attempts[i];
+                leaderboard.push({
+                    rank: currentRank,
+                    userId: attempt.userId?._id,
+                    username: attempt.userId?.username || 'Anonymous',
+                    score: attempt.score,
+                    totalQuestions: attempt.totalQuestions,
+                    correctAnswers: attempt.correctAnswers,
+                    percentage: attempt.totalQuestions > 0
+                        ? Math.round((attempt.correctAnswers / attempt.totalQuestions) * 100)
+                        : 0,
+                    timeTaken: Math.round(attempt.duration / 1000), // seconds
+                    completedAt: attempt.endTime || attempt.createdAt,
+                });
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    quizId,
+                    quizTitle: quiz.title,
+                    totalParticipants: leaderboard.length,
+                    leaderboard,
+                },
+            });
+        } catch (error) {
+            console.error('Leaderboard error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to fetch leaderboard',
             });
         }
     }

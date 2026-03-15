@@ -50,6 +50,12 @@ router.get(
     validateMongoId('quizId'),
     quizController.getQuiz,
 );
+router.get(
+    '/public/:quizId/leaderboard',
+    validateMongoId('quizId'),
+    quizController.getQuizLeaderboard,
+);
+
 
 // Protected routes (authentication required)
 router.use(verifyUser);
@@ -76,6 +82,8 @@ router.get(
 );
 
 router.get('/:quizId', validateMongoId('quizId'), quizController.getQuiz);
+router.get('/:quizId/leaderboard', validateMongoId('quizId'), quizController.getQuizLeaderboard);
+
 
 router.put(
     '/:quizId',

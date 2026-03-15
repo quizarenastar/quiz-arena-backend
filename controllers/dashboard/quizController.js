@@ -314,7 +314,7 @@ class quizController {
     async deleteQuiz(req, res) {
         try {
             const { quizId } = req.params;
-            const { reason } = req.body;
+            const reason = req.body?.reason;
 
             const quiz = await Quiz.findById(quizId);
             if (!quiz) {

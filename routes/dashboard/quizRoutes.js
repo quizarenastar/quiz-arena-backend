@@ -13,7 +13,6 @@ const {
 const { adminFilterSchema } = require('../../validation/commonValidations');
 
 const {
-    deleteQuizSchema,
     cancelQuizSchema,
 } = require('../../validation/quizValidation');
 
@@ -58,7 +57,6 @@ router.post(
 router.delete(
     '/:quizId',
     validateMongoId('quizId'),
-    validateBody(deleteQuizSchema),
     adminController.deleteQuiz
 );
 

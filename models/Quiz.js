@@ -39,11 +39,11 @@ const quizSchema = new mongoose.Schema(
         },
         startTime: {
             type: Date,
-            // Required for paid quizzes
+            required: true,
         },
         endTime: {
             type: Date,
-            // Required for paid quizzes
+            required: true,
         },
         duration: {
             type: Number,
@@ -82,6 +82,11 @@ const quizSchema = new mongoose.Schema(
         approvedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'DashboardUser',
+        },
+        aiReview: {
+            score: { type: Number, min: 0, max: 100 },
+            reason: { type: String },
+            reviewedAt: { type: Date },
         },
         settings: {
             allowReview: {
@@ -289,13 +294,24 @@ const quizSchema = new mongoose.Schema(
 // Virtual to check if quiz is active based on timing
 quizSchema.virtual('isActive').get(function () {
     if (this.status !== 'approved') return false;
-    if (!this.isPaid) return true;
 
     const now = new Date();
     if (this.startTime && now < this.startTime) return false;
     if (this.endTime && now > this.endTime) return false;
 
     return true;
+});
+
+// Virtual to check if quiz has ended
+quizSchema.virtual('isEnded').get(function () {
+    if (!this.endTime) return false;
+    return new Date() > new Date(this.endTime);
+});
+
+// Virtual to check if quiz is upcoming (not started yet)
+quizSchema.virtual('isUpcoming').get(function () {
+    if (!this.startTime) return false;
+    return new Date() < new Date(this.startTime);
 });
 
 // Virtual to check if quiz can be attempted

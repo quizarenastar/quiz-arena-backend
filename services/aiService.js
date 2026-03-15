@@ -556,6 +556,91 @@ Provide analysis in this JSON format:
             },
         };
     }
+
+    /**
+     * AI-powered quiz moderation.
+     * Returns { approved: boolean, reason: string, score: number (0-100) }
+     * 
+     * Approves if:
+     *  - Title and description are not offensive/irrelevant
+     *  - Questions are coherent, educational, and have clearly correct answers
+     *  - Options are plausible (not nonsensical)
+     *  - Content maintains a minimum quality threshold (score >= 60)
+     */
+    async reviewQuizForApproval(quiz, questions) {
+        try {
+            const questionSample = questions.slice(0, 10).map((q, i) => ({
+                index: i + 1,
+                question: q.question,
+                options: q.options,
+                correctAnswer: q.options[q.correctAnswer] ?? q.correctAnswer,
+                explanation: q.explanation || '',
+            }));
+
+            const prompt = `You are a quiz moderation AI. Review the following quiz submission and decide whether to APPROVE or REJECT it.
+
+Quiz Title: "${quiz.title}"
+Category: ${quiz.category}
+Difficulty: ${quiz.difficulty || quiz.difficultyLevel || 'unknown'}
+Description: "${quiz.description || 'No description'}"
+Total Questions: ${questions.length}
+
+Sample Questions (up to 10):
+${JSON.stringify(questionSample, null, 2)}
+
+Evaluate based on:
+1. Relevance: Questions match the title and category
+2. Quality: Questions are clear, specific and educational
+3. Correctness: The marked correct answer is actually correct
+4. Options quality: Distractors are plausible and non-offensive
+5. Content safety: No harmful, offensive or inappropriate content
+6. Minimum questions: At least 1 valid question present
+
+Respond ONLY with this JSON (no extra text):
+{
+  "approved": true or false,
+  "score": <0-100 quality score>,
+  "reason": "<one concise sentence explaining the decision>"
+}
+
+Approve (true) if score >= 60 and all content is safe. Reject (false) if score < 60 or content is unsafe/offensive.`;
+
+            const completion = await this.openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a strict but fair quiz quality moderator. Respond only with valid JSON.',
+                    },
+                    { role: 'user', content: prompt },
+                ],
+                temperature: 0.2,
+                max_tokens: 200,
+            });
+
+            const content = completion.choices[0].message.content?.trim() || '';
+            
+            // Extract JSON safely
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('No JSON in AI response');
+            
+            const result = JSON.parse(jsonMatch[0]);
+            return {
+                approved: Boolean(result.approved),
+                score: Number(result.score) || 50,
+                reason: String(result.reason || 'AI moderation completed'),
+            };
+        } catch (error) {
+            console.error('AI Quiz Review Error:', error.message);
+            // On AI failure, fall back to pending (manual review needed)
+            return {
+                approved: false,
+                score: 0,
+                reason: 'AI moderation unavailable — flagged for manual review',
+            };
+        }
+    }
 }
 
 module.exports = new AIService();
+

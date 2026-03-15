@@ -49,15 +49,9 @@ exports.createQuizSchema = Joi.object({
     duration: Joi.number().integer().min(1).max(7200).optional(),
     price: Joi.number().min(0).max(10000).optional(),
     isPaid: Joi.boolean().optional(),
-    startTime: Joi.alternatives()
-        .try(Joi.date().iso(), Joi.string().allow('', null))
-        .optional(),
-    endTime: Joi.alternatives()
-        .try(
-            Joi.date().iso().min(Joi.ref('startTime')),
-            Joi.string().allow('', null)
-        )
-        .optional(),
+    startTime: Joi.date().iso().required(),
+    endTime: Joi.date().iso().min(Joi.ref('startTime')).required(),
+
     numQuestions: Joi.number().integer().min(1).max(100).optional(),
     generateWithAI: Joi.boolean().optional(),
     questions: Joi.array()
@@ -78,6 +72,7 @@ exports.createQuizSchema = Joi.object({
                     .valid(...validDifficulties)
                     .optional(),
                 points: Joi.number().min(1).optional(),
+                timeLimit: Joi.number().integer().min(5).max(3600).optional(),
             })
         )
         .optional(),
@@ -120,6 +115,8 @@ exports.updateQuizSchema = Joi.object({
     timeLimit: Joi.number().integer().min(60).max(7200).optional(),
     price: Joi.number().min(0).max(100).optional(),
     isPaid: Joi.boolean().optional(),
+    startTime: Joi.date().iso().optional(),
+    endTime: Joi.date().iso().optional(),
     settings: Joi.object({
         maxAttempts: Joi.number().integer().min(1).max(10).optional(),
         showCorrectAnswers: Joi.boolean().optional(),
@@ -160,7 +157,7 @@ exports.submitAnswersSchema = Joi.object({
                 selectedOption: Joi.number().integer().min(0).max(3).required(),
             })
         )
-        .min(1)
+        .min(0)  // Allow empty — one-by-one flow stores answers server-side
         .required(),
     timeSpent: Joi.number().integer().min(0).optional(),
     tabSwitches: Joi.number().integer().min(0).optional(),
