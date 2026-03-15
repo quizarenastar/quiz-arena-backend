@@ -114,7 +114,3 @@ app.use((err, req, res, next) => {
     });
     res.status(statusCode).json({ success: false, message });
 });
-
-app.listen(5000, () => {
-    logger.info(`Server is running on http://localhost:5000`);
-});

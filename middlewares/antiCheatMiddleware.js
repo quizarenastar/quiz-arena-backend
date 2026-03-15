@@ -17,18 +17,18 @@ class AntiCheatMiddleware {
                 }
 
                 // Check if user is suspended or banned
-                if (user.suspended) {
+                if (user.blocked) {
                     return sendError(
                         res,
                         'Account suspended. Contact support for assistance.',
-                        403
+                        403,
                     );
                 }
 
                 // Check for suspicious activity patterns
                 const recentViolations = await QuizAttempt.countDocuments({
                     userId,
-                    'violations.timestamp': {
+                    'antiCheatViolations.timestamp': {
                         $gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
                     },
                 });
@@ -38,7 +38,7 @@ class AntiCheatMiddleware {
                     return sendError(
                         res,
                         'Too many anti-cheat violations detected. Access temporarily restricted.',
-                        429
+                        429,
                     );
                 }
 
@@ -80,7 +80,7 @@ class AntiCheatMiddleware {
                     return sendError(
                         res,
                         'Unauthorized access to quiz attempt',
-                        403
+                        403,
                     );
                 }
 
@@ -89,7 +89,7 @@ class AntiCheatMiddleware {
                     return sendError(
                         res,
                         'Quiz attempt already completed',
-                        400
+                        400,
                     );
                 }
 
@@ -97,14 +97,14 @@ class AntiCheatMiddleware {
                     return sendError(
                         res,
                         'Quiz attempt was abandoned due to violations',
-                        400
+                        400,
                     );
                 }
 
                 // Check time limit
-                const timeLimit = attempt.quizId.timeLimit * 1000; // Convert to milliseconds
+                const timeLimit = attempt.quizId.duration * 1000; // Convert to milliseconds
                 const timeElapsed =
-                    Date.now() - new Date(attempt.startedAt).getTime();
+                    Date.now() - new Date(attempt.startTime).getTime();
 
                 if (timeElapsed > timeLimit + 30000) {
                     // 30 second grace period
@@ -120,7 +120,7 @@ class AntiCheatMiddleware {
                     return sendError(
                         res,
                         'Quiz time limit exceeded. Attempt auto-submitted.',
-                        408
+                        408,
                     );
                 }
 
@@ -153,7 +153,7 @@ class AntiCheatMiddleware {
 
             const userViolations = violationCounts.get(userId);
             const recentViolations = userViolations.filter(
-                (time) => now - time < windowMs
+                (time) => now - time < windowMs,
             );
 
             // Update the map with recent violations
@@ -163,7 +163,7 @@ class AntiCheatMiddleware {
                 return sendError(
                     res,
                     'Too many violation reports. Please slow down.',
-                    429
+                    429,
                 );
             }
 
@@ -198,7 +198,7 @@ class AntiCheatMiddleware {
                     "img-src 'self' data: https:; " +
                     "connect-src 'self'; " +
                     "font-src 'self'; " +
-                    "frame-ancestors 'none';"
+                    "frame-ancestors 'none';",
             );
 
             next();
@@ -246,7 +246,7 @@ class AntiCheatMiddleware {
                                 type: 'suspicious_activity',
                                 details: `Suspicious score: ${suspiciousScore}`,
                                 metadata: { userAgent, ip },
-                            }
+                            },
                         );
                     }
                 }

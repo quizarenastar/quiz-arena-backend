@@ -199,7 +199,10 @@ class QuizController {
             let aiReview = null;
             if (questions.length > 0) {
                 try {
-                    aiReview = await AIService.reviewQuizForApproval(quiz, questions);
+                    aiReview = await AIService.reviewQuizForApproval(
+                        quiz,
+                        questions,
+                    );
                     if (aiReview.approved) {
                         quiz.status = 'approved';
                     }
@@ -229,14 +232,17 @@ class QuizController {
                     questions,
                     suggestedCategory,
                     aiReview: aiReview
-                        ? { approved: aiReview.approved, reason: aiReview.reason, score: aiReview.score }
+                        ? {
+                              approved: aiReview.approved,
+                              reason: aiReview.reason,
+                              score: aiReview.score,
+                          }
                         : null,
                 },
                 message: aiReview?.approved
                     ? 'Quiz created and approved automatically ✓'
                     : 'Quiz created and submitted for review',
             });
-
         } catch (error) {
             console.error('Create quiz error:', error);
             res.status(500).json({
@@ -392,13 +398,13 @@ class QuizController {
                 });
             }
 
-            // Check if quiz has been cancelled
-            if (quiz.status === 'cancelled') {
-                return res.status(400).json({
-                    success: false,
-                    message: 'This quiz has been cancelled',
-                });
-            }
+            // // Check if quiz has been cancelled
+            // if (quiz.status === 'cancelled') {
+            //     return res.status(400).json({
+            //         success: false,
+            //         message: 'This quiz has been cancelled',
+            //     });
+            // }
 
             // Check if start time has passed
             if (quiz.startTime && new Date() >= new Date(quiz.startTime)) {
@@ -542,8 +548,7 @@ class QuizController {
 
                 // Get current question from the stored order
                 const currentIdx = existingAttempt.currentQuestionIndex;
-                const questionId =
-                    existingAttempt.questionOrder[currentIdx];
+                const questionId = existingAttempt.questionOrder[currentIdx];
                 const currentQuestion = questionId
                     ? await Question.findById(questionId).select(
                           '-correctAnswer -explanation',
@@ -758,7 +763,8 @@ class QuizController {
                 selectedAnswer: selectedOption,
                 isCorrect,
                 timeSpent: timeSpent || 0,
-                isSkipped: selectedOption === null || selectedOption === undefined,
+                isSkipped:
+                    selectedOption === null || selectedOption === undefined,
             });
 
             // Advance to next question
@@ -794,9 +800,9 @@ class QuizController {
             // Get the next question
             const nextQuestionId =
                 attempt.questionOrder[attempt.currentQuestionIndex];
-            const nextQuestion = await Question.findById(
-                nextQuestionId,
-            ).select('-correctAnswer -explanation');
+            const nextQuestion = await Question.findById(nextQuestionId).select(
+                '-correctAnswer -explanation',
+            );
 
             // Calculate remaining time
             const timeRemaining =
@@ -859,9 +865,7 @@ class QuizController {
             }
 
             // Check if all questions are answered
-            if (
-                attempt.currentQuestionIndex >= attempt.questionOrder.length
-            ) {
+            if (attempt.currentQuestionIndex >= attempt.questionOrder.length) {
                 return res.json({
                     success: true,
                     data: {
@@ -1153,10 +1157,15 @@ class QuizController {
                 const authHeader = req.headers.authorization;
                 if (authHeader && authHeader.startsWith('Bearer ')) {
                     const jwt = require('jsonwebtoken');
-                    const decoded = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
+                    const decoded = jwt.verify(
+                        authHeader.slice(7),
+                        process.env.JWT_SECRET,
+                    );
                     userId = decoded.userId || decoded.id || decoded._id;
                 }
-            } catch { /* token invalid/absent — stay anonymous */ }
+            } catch {
+                /* token invalid/absent — stay anonymous */
+            }
 
             const quizzes = await Quiz.find(filter)
                 .populate('creatorId', 'username')
@@ -1172,7 +1181,8 @@ class QuizController {
             const quizzesWithMeta = quizzes.map((quiz) => {
                 const isRegistered = userId
                     ? (quiz.participantManagement?.registeredUsers || []).some(
-                          (reg) => reg.userId?.toString() === userId?.toString(),
+                          (reg) =>
+                              reg.userId?.toString() === userId?.toString(),
                       )
                     : false;
                 return { ...quiz, isRegistered };
@@ -1781,7 +1791,9 @@ class QuizController {
                 if (i > 0) {
                     const prev = attempts[i - 1];
                     const curr = attempts[i];
-                    const sameTie = prev.score === curr.score && prev.duration === curr.duration;
+                    const sameTie =
+                        prev.score === curr.score &&
+                        prev.duration === curr.duration;
                     if (!sameTie) currentRank = i + 1;
                 }
                 const attempt = attempts[i];
@@ -1792,9 +1804,14 @@ class QuizController {
                     score: attempt.score,
                     totalQuestions: attempt.totalQuestions,
                     correctAnswers: attempt.correctAnswers,
-                    percentage: attempt.totalQuestions > 0
-                        ? Math.round((attempt.correctAnswers / attempt.totalQuestions) * 100)
-                        : 0,
+                    percentage:
+                        attempt.totalQuestions > 0
+                            ? Math.round(
+                                  (attempt.correctAnswers /
+                                      attempt.totalQuestions) *
+                                      100,
+                              )
+                            : 0,
                     timeTaken: Math.round(attempt.duration / 1000), // seconds
                     completedAt: attempt.endTime || attempt.createdAt,
                 });
