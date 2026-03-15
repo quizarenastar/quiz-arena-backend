@@ -12,6 +12,17 @@ const quizAttemptSchema = new mongoose.Schema(
             ref: 'User',
             required: true,
         },
+        // Server-side question order tracking for one-by-one serving
+        questionOrder: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Question',
+            },
+        ],
+        currentQuestionIndex: {
+            type: Number,
+            default: 0,
+        },
         answers: [
             {
                 questionId: {

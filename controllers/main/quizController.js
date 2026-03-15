@@ -481,7 +481,7 @@ class QuizController {
         }
     }
 
-    // Start quiz attempt
+    // Start quiz attempt — returns only the FIRST question
     async startAttempt(req, res) {
         try {
             const { quizId } = req.params;
@@ -505,18 +505,29 @@ class QuizController {
             });
 
             if (existingAttempt) {
-                const questions = await Question.find({ quizId }).select(
-                    '-correctAnswer -explanation',
-                );
                 const timeRemaining =
-                    quiz.duration * 1000 - // duration is in seconds, convert to ms
+                    quiz.duration * 1000 -
                     (Date.now() - existingAttempt.startTime.getTime());
+
+                // Get current question from the stored order
+                const currentIdx = existingAttempt.currentQuestionIndex;
+                const questionId =
+                    existingAttempt.questionOrder[currentIdx];
+                const currentQuestion = questionId
+                    ? await Question.findById(questionId).select(
+                          '-correctAnswer -explanation',
+                      )
+                    : null;
+
                 return res.json({
                     success: true,
                     data: {
                         attemptId: existingAttempt._id,
-                        questions,
-                        timeLimit: Math.max(timeRemaining, 0), // Use remaining time as timeLimit
+                        currentQuestion,
+                        currentQuestionIndex: currentIdx,
+                        totalQuestions: existingAttempt.totalQuestions,
+                        answeredCount: existingAttempt.answers.length,
+                        timeLimit: Math.max(timeRemaining, 0),
                         timeRemaining: Math.max(timeRemaining, 0),
                         settings: quiz.settings,
                     },
@@ -526,7 +537,6 @@ class QuizController {
 
             // Handle payment for paid quizzes - CHECK REGISTRATION INSTEAD
             if (quiz.isPaid && quiz.price > 0) {
-                // Check if user is registered (payment already in escrow)
                 const registration =
                     quiz.participantManagement.registeredUsers.find(
                         (reg) => reg.userId.toString() === userId.toString(),
@@ -578,11 +588,29 @@ class QuizController {
                     });
                 }
             }
-            // Create quiz attempt
+
+            // Build question order (shuffle if setting enabled)
+            let questions = await Question.find({ quizId }).select('_id');
+            let questionOrder = questions.map((q) => q._id);
+
+            if (quiz.settings?.shuffleQuestions) {
+                // Fisher-Yates shuffle
+                for (let i = questionOrder.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [questionOrder[i], questionOrder[j]] = [
+                        questionOrder[j],
+                        questionOrder[i],
+                    ];
+                }
+            }
+
+            // Create quiz attempt with question order
             const attempt = new QuizAttempt({
                 quizId,
                 userId,
-                totalQuestions: quiz.totalQuestions,
+                totalQuestions: questionOrder.length,
+                questionOrder,
+                currentQuestionIndex: 0,
                 sessionData: {
                     ipAddress,
                     userAgent,
@@ -596,17 +624,20 @@ class QuizController {
             quiz.analytics.totalAttempts += 1;
             await quiz.save();
 
-            // Get questions without correct answers
-            const questions = await Question.find({ quizId }).select(
-                '-correctAnswer -explanation',
-            );
+            // Get only the FIRST question (without correct answer)
+            const firstQuestion = await Question.findById(
+                questionOrder[0],
+            ).select('-correctAnswer -explanation');
 
             res.json({
                 success: true,
                 data: {
                     attemptId: attempt._id,
-                    questions,
-                    timeLimit: quiz.duration * 1000, // Total quiz time in milliseconds (duration is now in seconds)
+                    currentQuestion: firstQuestion,
+                    currentQuestionIndex: 0,
+                    totalQuestions: questionOrder.length,
+                    answeredCount: 0,
+                    timeLimit: quiz.duration * 1000,
                     settings: quiz.settings,
                 },
                 message: 'Quiz attempt started',
@@ -616,6 +647,229 @@ class QuizController {
             res.status(500).json({
                 success: false,
                 message: 'Failed to start quiz attempt',
+            });
+        }
+    }
+
+    // Submit answer for a single question and get the next one
+    async submitSingleAnswer(req, res) {
+        try {
+            const { attemptId } = req.params;
+            const { questionId, selectedOption, timeSpent } = req.body;
+            const userId = req.userId;
+
+            const attempt = await QuizAttempt.findOne({
+                _id: attemptId,
+                userId,
+                status: 'in-progress',
+            });
+
+            if (!attempt) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Attempt not found or already completed',
+                });
+            }
+
+            // Check if attempt has expired
+            const quiz = await Quiz.findById(attempt.quizId);
+            const elapsed = Date.now() - attempt.startTime.getTime();
+            if (elapsed > quiz.duration * 1000) {
+                attempt.status = 'auto-submitted';
+                attempt.endTime = new Date();
+                attempt.duration = elapsed;
+                await attempt.save();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Quiz time has expired',
+                    expired: true,
+                });
+            }
+
+            // Validate this is the correct question in sequence
+            const expectedQuestionId =
+                attempt.questionOrder[attempt.currentQuestionIndex];
+            if (
+                !expectedQuestionId ||
+                expectedQuestionId.toString() !== questionId
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid question for current position',
+                });
+            }
+
+            // Check if already answered
+            const alreadyAnswered = attempt.answers.find(
+                (a) => a.questionId.toString() === questionId,
+            );
+            if (alreadyAnswered) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Question already answered',
+                });
+            }
+
+            // Get question to validate answer
+            const question = await Question.findById(questionId);
+            if (!question) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Question not found',
+                });
+            }
+
+            const isCorrect = question.correctAnswer === selectedOption;
+
+            // Record the answer
+            attempt.answers.push({
+                questionId,
+                selectedAnswer: selectedOption,
+                isCorrect,
+                timeSpent: timeSpent || 0,
+                isSkipped: selectedOption === null || selectedOption === undefined,
+            });
+
+            // Advance to next question
+            attempt.currentQuestionIndex += 1;
+
+            // Update running score
+            if (isCorrect) {
+                attempt.correctAnswers += 1;
+                attempt.score += question.points || 1;
+            }
+
+            await attempt.save();
+
+            // Check if there are more questions
+            const isLastQuestion =
+                attempt.currentQuestionIndex >= attempt.questionOrder.length;
+
+            if (isLastQuestion) {
+                // No more questions — return signal to submit
+                return res.json({
+                    success: true,
+                    data: {
+                        currentQuestion: null,
+                        currentQuestionIndex: attempt.currentQuestionIndex,
+                        totalQuestions: attempt.totalQuestions,
+                        answeredCount: attempt.answers.length,
+                        isComplete: true,
+                    },
+                    message: 'All questions answered',
+                });
+            }
+
+            // Get the next question
+            const nextQuestionId =
+                attempt.questionOrder[attempt.currentQuestionIndex];
+            const nextQuestion = await Question.findById(
+                nextQuestionId,
+            ).select('-correctAnswer -explanation');
+
+            // Calculate remaining time
+            const timeRemaining =
+                quiz.duration * 1000 -
+                (Date.now() - attempt.startTime.getTime());
+
+            res.json({
+                success: true,
+                data: {
+                    currentQuestion: nextQuestion,
+                    currentQuestionIndex: attempt.currentQuestionIndex,
+                    totalQuestions: attempt.totalQuestions,
+                    answeredCount: attempt.answers.length,
+                    isComplete: false,
+                    timeRemaining: Math.max(timeRemaining, 0),
+                },
+                message: 'Answer recorded, next question loaded',
+            });
+        } catch (error) {
+            console.error('Submit single answer error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to submit answer',
+            });
+        }
+    }
+
+    // Get the current question for an in-progress attempt
+    async getNextQuestion(req, res) {
+        try {
+            const { attemptId } = req.params;
+            const userId = req.userId;
+
+            const attempt = await QuizAttempt.findOne({
+                _id: attemptId,
+                userId,
+                status: 'in-progress',
+            });
+
+            if (!attempt) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Attempt not found or already completed',
+                });
+            }
+
+            // Check if attempt has expired
+            const quiz = await Quiz.findById(attempt.quizId);
+            const elapsed = Date.now() - attempt.startTime.getTime();
+            if (elapsed > quiz.duration * 1000) {
+                attempt.status = 'auto-submitted';
+                attempt.endTime = new Date();
+                attempt.duration = elapsed;
+                await attempt.save();
+                return res.status(400).json({
+                    success: false,
+                    message: 'Quiz time has expired',
+                    expired: true,
+                });
+            }
+
+            // Check if all questions are answered
+            if (
+                attempt.currentQuestionIndex >= attempt.questionOrder.length
+            ) {
+                return res.json({
+                    success: true,
+                    data: {
+                        currentQuestion: null,
+                        currentQuestionIndex: attempt.currentQuestionIndex,
+                        totalQuestions: attempt.totalQuestions,
+                        answeredCount: attempt.answers.length,
+                        isComplete: true,
+                    },
+                    message: 'All questions answered',
+                });
+            }
+
+            const questionId =
+                attempt.questionOrder[attempt.currentQuestionIndex];
+            const question = await Question.findById(questionId).select(
+                '-correctAnswer -explanation',
+            );
+
+            const timeRemaining =
+                quiz.duration * 1000 -
+                (Date.now() - attempt.startTime.getTime());
+
+            res.json({
+                success: true,
+                data: {
+                    currentQuestion: question,
+                    currentQuestionIndex: attempt.currentQuestionIndex,
+                    totalQuestions: attempt.totalQuestions,
+                    answeredCount: attempt.answers.length,
+                    isComplete: false,
+                    timeRemaining: Math.max(timeRemaining, 0),
+                },
+            });
+        } catch (error) {
+            console.error('Get next question error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to get next question',
             });
         }
     }

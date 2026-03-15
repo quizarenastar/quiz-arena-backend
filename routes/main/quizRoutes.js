@@ -6,6 +6,7 @@ const {
     updateQuizSchema,
     generateQuestionsSchema,
     submitAnswersSchema,
+    singleAnswerSchema,
     addQuestionSchema,
     updateQuestionSchema,
     violationSchema,
@@ -151,6 +152,20 @@ router.post(
     validateMongoId('attemptId'),
     validateBody(violationSchema),
     quizController.recordViolation,
+);
+
+// One-by-one question flow
+router.post(
+    '/attempts/:attemptId/answer',
+    validateMongoId('attemptId'),
+    validateBody(singleAnswerSchema),
+    quizController.submitSingleAnswer,
+);
+
+router.get(
+    '/attempts/:attemptId/current-question',
+    validateMongoId('attemptId'),
+    quizController.getNextQuestion,
 );
 
 router.post(

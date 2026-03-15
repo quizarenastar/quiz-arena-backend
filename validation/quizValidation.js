@@ -149,7 +149,7 @@ exports.generateQuestionsSchema = Joi.object({
     questionType: Joi.string().valid('mcq', 'true-false', 'mixed').optional(),
 });
 
-// Answer submission schema
+// Answer submission schema (batch — existing)
 exports.submitAnswersSchema = Joi.object({
     answers: Joi.array()
         .items(
@@ -164,6 +164,15 @@ exports.submitAnswersSchema = Joi.object({
         .required(),
     timeSpent: Joi.number().integer().min(0).optional(),
     tabSwitches: Joi.number().integer().min(0).optional(),
+});
+
+// Single answer submission schema (one-by-one flow)
+exports.singleAnswerSchema = Joi.object({
+    questionId: Joi.string()
+        .pattern(/^[0-9a-fA-F]{24}$/)
+        .required(),
+    selectedOption: Joi.number().integer().min(0).max(5).allow(null).required(),
+    timeSpent: Joi.number().integer().min(0).optional(),
 });
 
 // Question addition schema
