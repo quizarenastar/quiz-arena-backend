@@ -28,7 +28,6 @@ const userSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
-
         wallet: {
             balance: {
                 type: Number,
@@ -42,22 +41,6 @@ const userSchema = new mongoose.Schema(
             totalSpent: {
                 type: Number,
                 default: 0,
-            },
-        },
-        subscription: {
-            type: {
-                type: String,
-                enum: ['basic', 'premium'],
-            },
-            startDate: {
-                type: Date,
-            },
-            endDate: {
-                type: Date,
-            },
-            isActive: {
-                type: Boolean,
-                default: false,
             },
         },
         analytics: {
@@ -80,20 +63,6 @@ const userSchema = new mongoose.Schema(
             totalTimeSpent: {
                 type: Number,
                 default: 0,
-            },
-        },
-        preferences: {
-            emailNotifications: {
-                type: Boolean,
-                default: true,
-            },
-            darkMode: {
-                type: Boolean,
-                default: false,
-            },
-            language: {
-                type: String,
-                default: 'en',
             },
         },
     },

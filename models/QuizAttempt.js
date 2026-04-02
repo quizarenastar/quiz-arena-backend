@@ -31,7 +31,7 @@ const quizAttemptSchema = new mongoose.Schema(
                     required: true,
                 },
                 selectedAnswer: {
-                    type: mongoose.Schema.Types.Mixed, // Can be number, string, or array
+                    type: mongoose.Schema.Types.Mixed,
                 },
                 isCorrect: {
                     type: Boolean,
@@ -39,16 +39,11 @@ const quizAttemptSchema = new mongoose.Schema(
                 },
                 timeSpent: {
                     type: Number,
-                    default: 0, // in seconds
+                    default: 0,
                 },
                 isSkipped: {
                     type: Boolean,
                     default: false,
-                },
-                confidence: {
-                    type: Number,
-                    min: 1,
-                    max: 5, // User confidence level
                 },
             },
         ],
@@ -81,7 +76,7 @@ const quizAttemptSchema = new mongoose.Schema(
         },
         duration: {
             type: Number,
-            default: 0, // actual time taken in seconds
+            default: 0,
         },
         status: {
             type: String,
@@ -136,115 +131,6 @@ const quizAttemptSchema = new mongoose.Schema(
                 type: String,
                 required: true,
             },
-            browserFingerprint: {
-                type: String,
-            },
-            screenResolution: {
-                type: String,
-            },
-            timezone: {
-                type: String,
-            },
-        },
-        analytics: {
-            averageTimePerQuestion: {
-                type: Number,
-                default: 0,
-            },
-            questionsRevisited: {
-                type: Number,
-                default: 0,
-            },
-            totalKeystrokes: {
-                type: Number,
-                default: 0,
-            },
-            totalMouseClicks: {
-                type: Number,
-                default: 0,
-            },
-            focusLostCount: {
-                type: Number,
-                default: 0,
-            },
-        },
-        aiAnalysis: {
-            performanceInsights: {
-                type: String,
-            },
-            strengthAreas: [
-                {
-                    topic: String,
-                    score: Number,
-                },
-            ],
-            weaknessAreas: [
-                {
-                    topic: String,
-                    score: Number,
-                    suggestions: [String],
-                },
-            ],
-            overallRating: {
-                type: String,
-                enum: ['excellent', 'good', 'average', 'needs-improvement'],
-            },
-            timeManagement: {
-                rating: {
-                    type: String,
-                    enum: ['excellent', 'good', 'average', 'poor'],
-                },
-                feedback: String,
-            },
-            recommendedStudyPlan: [
-                {
-                    topic: String,
-                    priority: {
-                        type: String,
-                        enum: ['high', 'medium', 'low'],
-                    },
-                    studyTime: Number, // minutes
-                    resources: [String],
-                },
-            ],
-            confidenceAnalysis: {
-                overconfident: Boolean,
-                underconfident: Boolean,
-                wellCalibrated: Boolean,
-                feedback: String,
-            },
-        },
-        review: {
-            isReviewed: {
-                type: Boolean,
-                default: false,
-            },
-            reviewedAt: {
-                type: Date,
-            },
-            flaggedQuestions: [
-                {
-                    questionId: {
-                        type: mongoose.Schema.Types.ObjectId,
-                        ref: 'Question',
-                    },
-                    reason: String,
-                },
-            ],
-        },
-        retakeData: {
-            isRetake: {
-                type: Boolean,
-                default: false,
-            },
-            previousAttemptId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'QuizAttempt',
-            },
-            retakeNumber: {
-                type: Number,
-                default: 1,
-            },
         },
     },
     { timestamps: true }
@@ -254,7 +140,6 @@ const quizAttemptSchema = new mongoose.Schema(
 quizAttemptSchema.index({ quizId: 1, userId: 1 });
 quizAttemptSchema.index({ userId: 1, createdAt: -1 });
 quizAttemptSchema.index({ status: 1, createdAt: -1 });
-quizAttemptSchema.index({ 'sessionData.ipAddress': 1 });
 
 // Virtual for calculating accuracy
 quizAttemptSchema.virtual('accuracy').get(function () {

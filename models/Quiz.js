@@ -70,9 +70,6 @@ const quizSchema = new mongoose.Schema(
                 trim: true,
             },
         ],
-        thumbnailUrl: {
-            type: String,
-        },
         publishedAt: {
             type: Date,
         },
@@ -89,51 +86,9 @@ const quizSchema = new mongoose.Schema(
             reviewedAt: { type: Date },
         },
         settings: {
-            allowReview: {
-                type: Boolean,
-                default: true,
-            },
-            showResults: {
-                type: Boolean,
-                default: true,
-            },
             shuffleQuestions: {
                 type: Boolean,
                 default: false,
-            },
-            allowSkipQuestions: {
-                type: Boolean,
-                default: true,
-            },
-            antiCheat: {
-                enableTabSwitchDetection: {
-                    type: Boolean,
-                    default: true,
-                },
-                maxTabSwitches: {
-                    type: Number,
-                    default: 3,
-                },
-                enableTimeLimit: {
-                    type: Boolean,
-                    default: true,
-                },
-                autoSubmitOnViolation: {
-                    type: Boolean,
-                    default: true,
-                },
-                preventCopyPaste: {
-                    type: Boolean,
-                    default: true,
-                },
-                preventRightClick: {
-                    type: Boolean,
-                    default: true,
-                },
-                enableFullScreen: {
-                    type: Boolean,
-                    default: false,
-                },
             },
         },
         analytics: {
@@ -188,7 +143,7 @@ const quizSchema = new mongoose.Schema(
                     status: {
                         type: String,
                         enum: ['registered', 'paid', 'refunded'],
-                        default: 'paid', // Payment held in escrow
+                        default: 'paid',
                     },
                     paymentId: {
                         type: mongoose.Schema.Types.ObjectId,
@@ -202,7 +157,7 @@ const quizSchema = new mongoose.Schema(
             },
             minParticipants: {
                 type: Number,
-                default: 5, // Minimum 5 for paid quizzes
+                default: 5,
             },
         },
         // Prize Pool Management
@@ -213,15 +168,15 @@ const quizSchema = new mongoose.Schema(
             },
             platformFee: {
                 type: Number,
-                default: 0, // 20% of total
+                default: 0,
             },
             creatorFee: {
                 type: Number,
-                default: 0, // 30% of total
+                default: 0,
             },
             prizeMoney: {
                 type: Number,
-                default: 0, // 50% of total
+                default: 0,
             },
             distributed: {
                 type: Boolean,
@@ -330,7 +285,6 @@ quizSchema.index({ status: 1, createdAt: -1 });
 quizSchema.index({ topic: 1, difficulty: 1 });
 quizSchema.index({ isPaid: 1, price: 1 });
 quizSchema.index({ category: 1, visibility: 1 });
-// Index for scheduled task optimization (auto-cancel and prize distribution)
 quizSchema.index({ startTime: 1, status: 1 });
 quizSchema.index({ endTime: 1, status: 1, 'prizePool.distributed': 1 });
 

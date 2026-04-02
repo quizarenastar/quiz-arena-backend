@@ -397,25 +397,31 @@ class quizController {
             let totalRefunded = 0;
 
             // If it's a paid quiz, process refunds for all participants
-            if (quiz.isPaid && quiz.entryFee > 0) {
+            if (quiz.isPaid && quiz.price > 0) {
                 // Find all users who paid for this quiz
                 const paidTransactions = await Transaction.find({
-                    quizId: quizId,
-                    type: 'quiz-entry',
+                    relatedQuizId: quizId,
+                    type: 'payment',
                     status: 'completed',
                 }).populate('userId');
 
                 // Process refunds
                 for (const transaction of paidTransactions) {
                     try {
+                        const user = await User.findById(transaction.userId._id);
+                        const balanceBefore = user?.wallet?.balance || 0;
+
                         // Create refund transaction
                         const refundTransaction = new Transaction({
                             userId: transaction.userId._id,
-                            quizId: quizId,
+                            relatedQuizId: quizId,
                             amount: transaction.amount,
                             type: 'refund',
                             status: 'completed',
                             description: `Refund for cancelled quiz: ${quiz.title}`,
+                            paymentMethod: 'wallet',
+                            balanceBefore: balanceBefore,
+                            balanceAfter: balanceBefore + transaction.amount,
                             metadata: {
                                 originalTransactionId: transaction._id,
                                 cancellationReason: reason,

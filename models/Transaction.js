@@ -43,19 +43,8 @@ const transactionSchema = new mongoose.Schema(
         },
         paymentMethod: {
             type: String,
-            enum: ['wallet', 'bank-transfer', 'crypto', 'card', 'upi'],
+            enum: ['wallet', 'bank-transfer', 'upi'],
             required: true,
-        },
-        paymentGateway: {
-            transactionId: {
-                type: String,
-            },
-            paymentIntentId: {
-                type: String,
-            },
-            gatewayResponse: {
-                type: mongoose.Schema.Types.Mixed,
-            },
         },
         metadata: {
             type: mongoose.Schema.Types.Mixed,
@@ -132,19 +121,6 @@ const transactionSchema = new mongoose.Schema(
         reasonForRejection: {
             type: String,
         },
-        tax: {
-            taxAmount: {
-                type: Number,
-                default: 0,
-            },
-            taxRate: {
-                type: Number,
-                default: 0,
-            },
-            taxRegion: {
-                type: String,
-            },
-        },
     },
     { timestamps: true }
 );
@@ -153,7 +129,6 @@ const transactionSchema = new mongoose.Schema(
 transactionSchema.index({ userId: 1, createdAt: -1 });
 transactionSchema.index({ type: 1, status: 1 });
 transactionSchema.index({ relatedQuizId: 1 });
-transactionSchema.index({ 'paymentGateway.transactionId': 1 });
 transactionSchema.index({ status: 1, type: 1 });
 
 const Transaction = mongoose.model('Transaction', transactionSchema);

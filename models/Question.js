@@ -14,7 +14,7 @@ const questionSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['multiple-choice', 'true-false', 'fill-blank', 'essay'],
+            enum: ['multiple-choice', 'true-false'],
             default: 'multiple-choice',
         },
         options: [
@@ -26,7 +26,7 @@ const questionSchema = new mongoose.Schema(
             },
         ],
         correctAnswer: {
-            type: mongoose.Schema.Types.Mixed, // Number for MCQ, String for others
+            type: mongoose.Schema.Types.Mixed,
             required: true,
         },
         explanation: {
@@ -40,7 +40,7 @@ const questionSchema = new mongoose.Schema(
         },
         timeLimit: {
             type: Number,
-            default: 30, // seconds per question
+            default: 30,
         },
         difficulty: {
             type: String,
@@ -55,9 +55,6 @@ const questionSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
-        aiPrompt: {
-            type: String, // Store the prompt used for AI generation
-        },
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
@@ -66,18 +63,6 @@ const questionSchema = new mongoose.Schema(
         order: {
             type: Number,
             default: 0,
-        },
-        media: {
-            type: {
-                type: String,
-                enum: ['image', 'video', 'audio'],
-            },
-            url: {
-                type: String,
-            },
-            description: {
-                type: String,
-            },
         },
         analytics: {
             totalAttempts: {
@@ -91,12 +76,6 @@ const questionSchema = new mongoose.Schema(
             averageTimeSpent: {
                 type: Number,
                 default: 0,
-            },
-            difficultyRating: {
-                type: Number,
-                default: 0,
-                min: 0,
-                max: 5,
             },
         },
         tags: [
@@ -116,8 +95,6 @@ const questionSchema = new mongoose.Schema(
 // Indexes for performance
 questionSchema.index({ quizId: 1, order: 1 });
 questionSchema.index({ createdBy: 1 });
-questionSchema.index({ topic: 1, difficulty: 1 });
-questionSchema.index({ isAIGenerated: 1 });
 
 const Question = mongoose.model('Question', questionSchema);
 

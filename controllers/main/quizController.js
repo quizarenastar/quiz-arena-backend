@@ -97,32 +97,7 @@ class QuizController {
                 endTime: cleanEndTime ? new Date(cleanEndTime) : undefined,
                 visibility: visibility || 'public',
                 settings: {
-                    allowReview: settings?.allowReview ?? true,
-                    showResults: settings?.showResults ?? true,
                     shuffleQuestions: settings?.shuffleQuestions ?? false,
-                    allowSkipQuestions: settings?.allowSkipQuestions ?? true,
-                    antiCheat: {
-                        enableTabSwitchDetection:
-                            settings?.antiCheat?.enableTabSwitchDetection ??
-                            settings?.antiCheat?.detectTabSwitch ??
-                            true,
-                        maxTabSwitches:
-                            settings?.antiCheat?.maxTabSwitches ?? 3,
-                        enableTimeLimit:
-                            settings?.antiCheat?.enableTimeLimit ??
-                            settings?.antiCheat?.timeLimit ??
-                            true,
-                        autoSubmitOnViolation:
-                            settings?.antiCheat?.autoSubmitOnViolation ?? true,
-                        preventCopyPaste:
-                            settings?.antiCheat?.preventCopyPaste ??
-                            settings?.antiCheat?.detectCopyPaste ??
-                            true,
-                        preventRightClick:
-                            settings?.antiCheat?.preventRightClick ?? true,
-                        enableFullScreen:
-                            settings?.antiCheat?.enableFullScreen ?? false,
-                    },
                 },
             });
 
@@ -414,6 +389,14 @@ class QuizController {
                 });
             }
 
+            // Prevent creator from registering for their own quiz
+            if (quiz.creatorId.toString() === userId.toString()) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You cannot register for your own quiz',
+                });
+            }
+
             // Check if user already registered
             const alreadyRegistered =
                 quiz.participantManagement.registeredUsers.find(
@@ -534,6 +517,14 @@ class QuizController {
                 });
             }
 
+            // Prevent quiz creator from participating in their own quiz
+            if (quiz.creatorId.toString() === userId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'You cannot participate in your own quiz',
+                });
+            }
+
             // Check if user already has an in-progress attempt
             const existingAttempt = await QuizAttempt.findOne({
                 quizId,
@@ -565,7 +556,6 @@ class QuizController {
                         answeredCount: existingAttempt.answers.length,
                         timeLimit: Math.max(timeRemaining, 0),
                         timeRemaining: Math.max(timeRemaining, 0),
-                        settings: quiz.settings,
                     },
                     message: 'Resuming existing attempt',
                 });
@@ -674,7 +664,6 @@ class QuizController {
                     totalQuestions: questionOrder.length,
                     answeredCount: 0,
                     timeLimit: quiz.duration * 1000,
-                    settings: quiz.settings,
                 },
                 message: 'Quiz attempt started',
             });
@@ -1055,6 +1044,23 @@ class QuizController {
                 console.error('Failed to generate analysis:', analysisError);
             }
 
+            // Build answers with details for the response
+            const answersWithDetails = attempt.answers.map((a) => {
+                const question = questions.find(
+                    (q) => q._id.toString() === (a.questionId?.toString() || a.questionId),
+                );
+                return {
+                    questionId: a.questionId,
+                    selectedOption: a.selectedAnswer,
+                    isCorrect: a.isCorrect,
+                    timeSpent: a.timeSpent,
+                    question: question?.question,
+                    options: question?.options,
+                    correctAnswer: question?.correctAnswer,
+                    explanation: question?.explanation,
+                };
+            });
+
             res.json({
                 success: true,
                 data: {
@@ -1065,20 +1071,7 @@ class QuizController {
                     duration: attempt.duration,
                     isValid,
                     analysis,
-                    answers: attempt.settings?.showResults
-                        ? processedAnswers.map((a) => {
-                              const question = questions.find(
-                                  (q) => q._id.toString() === a.questionId,
-                              );
-                              return {
-                                  ...a,
-                                  question: question?.question,
-                                  options: question?.options,
-                                  correctAnswer: question?.correctAnswer,
-                                  explanation: question?.explanation,
-                              };
-                          })
-                        : null,
+                    answers: answersWithDetails,
                 },
                 message: 'Quiz submitted successfully',
             });
@@ -1242,15 +1235,20 @@ class QuizController {
             }
 
             const detailedAnswers = attempt.answers.map((a) => {
+                const answerObj = a.toObject ? a.toObject() : a;
                 const question = questions.find(
-                    (q) => q._id.toString() === a.questionId.toString(),
+                    (q) => q._id.toString() === answerObj.questionId.toString(),
                 );
                 return {
-                    ...a,
-                    question: question?.question,
-                    options: question?.options,
+                    questionId: answerObj.questionId,
+                    selectedAnswer: answerObj.selectedAnswer,
+                    isCorrect: answerObj.isCorrect || false,
+                    isSkipped: answerObj.isSkipped || false,
+                    timeSpent: answerObj.timeSpent || 0,
+                    question: question?.question || '',
+                    options: question?.options || [],
                     correctAnswer: question?.correctAnswer,
-                    explanation: question?.explanation,
+                    explanation: question?.explanation || '',
                 };
             });
 
@@ -1343,6 +1341,14 @@ class QuizController {
                 return res.status(400).json({
                     success: false,
                     message: 'Cannot update quiz that is pending or approved',
+                });
+            }
+
+            // Prevent editing after start time
+            if (quiz.startTime && new Date() >= new Date(quiz.startTime)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Cannot edit quiz after it has started',
                 });
             }
 
@@ -1655,20 +1661,20 @@ class QuizController {
 
             try {
                 // Generate questions with AI
-                const aiQuestions = await AIService.generateQuizQuestions(
+                const aiResult = await AIService.generateQuizQuestions(
                     topic || quiz.topic,
                     count,
-                    difficulty || quiz.difficultyLevel,
+                    difficulty || quiz.difficulty,
                     category || quiz.category,
                 );
 
                 const questions = [];
-                for (const qData of aiQuestions) {
+                for (const qData of aiResult.questions) {
                     const question = new Question({
                         ...qData,
                         quizId: quiz._id,
                         createdBy: userId,
-                        difficultyLevel: difficulty || quiz.difficultyLevel,
+                        difficulty: difficulty || quiz.difficulty,
                         isAIGenerated: true,
                     });
                     await question.save();
