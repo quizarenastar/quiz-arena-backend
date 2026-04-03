@@ -74,8 +74,35 @@ app.use((req, res, next) => {
     next();
 });
 
-app.get('/', (req, res) => {
-    res.send('Quiz Arena Backend is running');
+app.get('/', async (req, res) => {
+    try {
+        const dbState = mongoose.connection.readyState;
+
+        const healthData = {
+            status: 'ok',
+            uptime: process.uptime(), // seconds
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV,
+            db: dbState === 1 ? 'connected' : 'disconnected',
+            memoryUsage: process.memoryUsage(),
+        };
+
+        // If DB is not connected → unhealthy
+        if (dbState !== 1) {
+            return res.status(500).json({
+                status: 'error',
+                message: 'Database not connected',
+                ...healthData,
+            });
+        }
+
+        res.status(200).json(healthData);
+    } catch (error) {
+        res.status(500).json({
+            status: 'error',
+            message: error.message,
+        });
+    }
 });
 
 // Main routes
