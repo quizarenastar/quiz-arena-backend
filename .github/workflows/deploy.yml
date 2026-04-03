@@ -1,0 +1,32 @@
+name: Deploy Quiz-Arena-Backend
+
+on:
+    push:
+        branches:
+            - main
+            - staging
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: SSH Deploy
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SERVER_IP }}
+                  username: ${{ secrets.SERVER_USER }}
+                  key: ${{ secrets.SSH_KEY }}
+
+                  script: |
+                      if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+                        cd ~/apps/production
+                        git pull origin main
+                        npm install
+                        pm2 restart prod-backend
+                      else
+                        cd ~/apps/staging
+                        git pull origin staging
+                        npm install
+                        pm2 restart staging-backend
+                      fi
