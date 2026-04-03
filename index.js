@@ -6,6 +6,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const { MONGODB_URI } = require('./configs');
+const PORT = process.env.PORT || 5000;
 
 const app = express();
 app.use(express.json());
@@ -34,7 +35,7 @@ async function main() {
         logger.info('✅ Cron scheduler started');
 
         // Start the server *after* successful DB connection
-        app.listen(5000, () => {
+        app.listen(PORT, () => {
             logger.info(`🚀 Server is running on http://localhost:5000`);
         });
     } catch (err) {
