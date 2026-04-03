@@ -1352,13 +1352,12 @@ class QuizController {
                 });
             }
 
-            // Filter allowed updates
+            // Filter allowed updates (isPaid and price are excluded —
+            // pricing cannot be changed after creation)
             const allowedUpdates = [
                 'title',
                 'description',
                 'topic',
-                'isPaid',
-                'price',
                 'duration',
                 'difficulty',
                 'tags',
