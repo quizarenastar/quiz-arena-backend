@@ -1,28 +1,42 @@
 const dotenv = require('dotenv');
 dotenv.config();
 const express = require('express');
+const http = require('http');
+const { Server: SocketIO } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const { MONGODB_URI } = require('./configs');
+const initWarRoomSocket = require('./services/warRoomSocket');
 const PORT = process.env.PORT || 5000;
 
 const app = express();
+const server = http.createServer(app);
+
 app.use(express.json());
+const corsOrigins = [
+    'http://localhost:5001',
+    'http://localhost:5002',
+    'https://quizarena.in',
+    'https://dashboard.quizarena.in',
+];
 const corsOptions = {
-    origin: [
-        'http://localhost:5001',
-        'http://localhost:5002',
-        'https://quizarena.in',
-        'https://dashboard.quizarena.in',
-    ],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 app.use(cors(corsOptions));
+
+// Initialize Socket.IO with same CORS origins
+const io = new SocketIO(server, {
+    cors: {
+        origin: corsOrigins,
+        credentials: true,
+    },
+});
 
 async function main() {
     try {
@@ -34,9 +48,13 @@ async function main() {
         cronScheduler.startAll();
         logger.info('✅ Cron scheduler started');
 
+        // Initialize War Room WebSocket handler
+        initWarRoomSocket(io);
+        logger.info('✅ War Room WebSocket initialized');
+
         // Start the server *after* successful DB connection
-        app.listen(PORT, () => {
-            logger.info(`🚀 Server is running on http://localhost:5000`);
+        server.listen(PORT, () => {
+            logger.info(`🚀 Server is running on http://localhost:${PORT}`);
         });
     } catch (err) {
         logger.error('❌ Failed to connect to DB', { error: err });
@@ -110,6 +128,7 @@ app.use('/api/v1/users', require('./routes/main/userRoutes'));
 app.use('/api/v1/contact', require('./routes/main/contactRoutes'));
 app.use('/api/v1/quizzes', require('./routes/main/quizRoutes'));
 app.use('/api/v1/wallet', require('./routes/main/walletRoutes'));
+app.use('/api/v1/war-rooms', require('./routes/main/warRoomRoutes'));
 
 // Dashboard routes
 app.use(
@@ -120,6 +139,7 @@ app.use('/dashboard/v1/contact', require('./routes/dashboard/contactRoutes'));
 app.use('/dashboard/v1/stats', require('./routes/dashboard/statsRoutes'));
 app.use('/dashboard/v1/quizzes', require('./routes/dashboard/quizRoutes'));
 app.use('/dashboard/v1/wallet', require('./routes/dashboard/walletRoutes'));
+app.use('/dashboard/v1/war-rooms', require('./routes/dashboard/warRoomRoutes'));
 
 // 404 handler (Express 5: use a regex-style catch-all)
 app.use((req, res, next) => {
