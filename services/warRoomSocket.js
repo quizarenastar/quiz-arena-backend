@@ -305,7 +305,7 @@ function initWarRoomSocket(io) {
         });
 
         // ─── START QUIZ (Host only) ─────────────────────────────
-        socket.on('war-room:start-quiz', async (_, callback) => {
+        socket.on('war-room:start-quiz', async (data, callback) => {
             try {
                 const room = await WarRoom.findById(socket.currentRoomId);
                 if (!room) return callback?.({ error: 'Room not found' });
@@ -317,13 +317,24 @@ function initWarRoomSocket(io) {
                 }
 
                 const onlineMembers = room.members.filter((m) => m.isOnline);
-                if (onlineMembers.length < 2) {
+                if (onlineMembers.length < 1) {
                     return callback?.({
-                        error: 'Need at least 2 online players to start',
+                        error: 'Need at least 1 online player to start',
                     });
                 }
 
-                // Set status to countdown
+                // Apply quiz settings from client payload
+                const quizSettings = {
+                    topic: data?.topic || room.settings.topic || 'General Knowledge',
+                    category: data?.category || room.settings.category || 'general-knowledge',
+                    difficulty: data?.difficulty || room.settings.difficulty || 'medium',
+                    totalQuestions: data?.totalQuestions || room.settings.totalQuestions || 10,
+                    timePerQuestion: data?.timePerQuestion || room.settings.timePerQuestion || 30,
+                    countdownSeconds: room.settings.countdownSeconds || 5,
+                };
+
+                // Save settings to room for reference
+                room.settings = { ...room.settings, ...quizSettings };
                 room.status = 'countdown';
                 room.lastActivityAt = new Date();
                 await room.save();
@@ -332,11 +343,11 @@ function initWarRoomSocket(io) {
 
                 await createSystemMessage(
                     room._id,
-                    `Quiz is starting in ${room.settings.countdownSeconds} seconds!`
+                    `Quiz is starting in ${quizSettings.countdownSeconds} seconds!`
                 );
 
                 // Countdown
-                const countdownSecs = room.settings.countdownSeconds;
+                const countdownSecs = quizSettings.countdownSeconds;
                 for (let i = countdownSecs; i >= 1; i--) {
                     warRoomNs.to(socket.currentRoomCode).emit('war-room:countdown', {
                         seconds: i,
@@ -355,13 +366,13 @@ function initWarRoomSocket(io) {
                 let warRoomQuiz = await WarRoomQuiz.create({
                     warRoomId: room._id,
                     roundNumber: newRound,
-                    topic: room.settings.topic,
-                    difficulty: room.settings.difficulty,
-                    category: room.settings.category,
-                    totalQuestions: room.settings.totalQuestions,
+                    topic: quizSettings.topic,
+                    difficulty: quizSettings.difficulty,
+                    category: quizSettings.category,
+                    totalQuestions: quizSettings.totalQuestions,
                     duration:
-                        room.settings.totalQuestions *
-                        room.settings.timePerQuestion,
+                        quizSettings.totalQuestions *
+                        quizSettings.timePerQuestion,
                     status: 'generating',
                     questions: [],
                 });
@@ -369,16 +380,16 @@ function initWarRoomSocket(io) {
                 try {
                     const { questions } =
                         await aiService.generateQuizQuestions(
-                            room.settings.topic,
-                            room.settings.totalQuestions,
-                            room.settings.difficulty,
-                            room.settings.category
+                            quizSettings.topic,
+                            quizSettings.totalQuestions,
+                            quizSettings.difficulty,
+                            quizSettings.category
                         );
 
                     // Add timeLimit from settings to each question
                     const formattedQuestions = questions.map((q) => ({
                         ...q,
-                        timeLimit: room.settings.timePerQuestion,
+                        timeLimit: quizSettings.timePerQuestion,
                     }));
 
                     warRoomQuiz.questions = formattedQuestions;
