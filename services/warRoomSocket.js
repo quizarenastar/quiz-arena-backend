@@ -168,6 +168,50 @@ function initWarRoomSocket(io) {
                     room: freshRoom,
                     messages: messages.reverse(),
                 });
+
+                // If room is in-progress, send the active quiz state to this user
+                if (freshRoom.status === 'in-progress' && freshRoom.currentQuizId) {
+                    const activeQuiz = await WarRoomQuiz.findById(freshRoom.currentQuizId);
+                    if (activeQuiz && activeQuiz.status === 'in-progress') {
+                        const sanitizedQuestions = activeQuiz.questions.map(
+                            (q, idx) => ({
+                                index: idx,
+                                question: q.question,
+                                options: q.options,
+                                timeLimit: q.timeLimit,
+                                points: q.points,
+                            })
+                        );
+                        
+                        let elapsedSeconds = 0;
+                        if (activeQuiz.startedAt) {
+                            elapsedSeconds = Math.floor((Date.now() - new Date(activeQuiz.startedAt).getTime()) / 1000);
+                        }
+                        const remainingDuration = Math.max(0, activeQuiz.duration - elapsedSeconds);
+
+                        // Find existing attempt for this user
+                        const attempt = await WarRoomAttempt.findOne({
+                            warRoomQuizId: activeQuiz._id,
+                            userId: socket.userData.userId
+                        });
+
+                        const answeredQuestionIndices = attempt ? attempt.answers.map(a => a.questionIndex) : [];
+                        const currentScore = attempt ? attempt.score : 0;
+
+                        socket.emit('war-room:quiz-start', {
+                            quizId: activeQuiz._id,
+                            roundNumber: freshRoom.roundNumber,
+                            topic: activeQuiz.topic,
+                            difficulty: activeQuiz.difficulty,
+                            totalQuestions: activeQuiz.totalQuestions,
+                            duration: remainingDuration,
+                            questions: sanitizedQuestions,
+                            startedAt: activeQuiz.startedAt,
+                            answeredQuestionIndices,
+                            currentScore
+                        });
+                    }
+                }
             } catch (err) {
                 logger.error('war-room:join error', { error: err.message });
                 callback?.({ error: 'Failed to join room' });
