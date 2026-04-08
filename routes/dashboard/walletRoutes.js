@@ -18,14 +18,14 @@ router.get('/transactions', walletController.getTransactions);
 
 // Approve fund addition
 router.post(
-    '/wallet/fund-addition/:transactionId/approve',
+    '/fund-addition/:transactionId/approve',
     validateMongoId('transactionId'),
     walletController.approveFundAddition
 );
 
 // Reject fund addition
 router.post(
-    '/wallet/fund-addition/:transactionId/reject',
+    '/fund-addition/:transactionId/reject',
     validateMongoId('transactionId'),
     validateBody(approveRejectSchema),
     walletController.rejectFundAddition
@@ -33,21 +33,21 @@ router.post(
 
 // Approve withdrawal
 router.post(
-    '/wallet/withdrawal/:transactionId/approve',
+    '/withdrawal/:transactionId/approve',
     validateMongoId('transactionId'),
     walletController.approveWithdrawal
 );
 
 // Reject withdrawal
 router.post(
-    '/wallet/withdrawal/:transactionId/reject',
+    '/withdrawal/:transactionId/reject',
     validateMongoId('transactionId'),
     validateBody(approveRejectSchema),
     walletController.rejectWithdrawal
 );
 
 // Get all pending wallet transactions
-router.get('/wallet/pending-transactions', walletController.getTransactions);
+router.get('/pending-transactions', walletController.getTransactions);
 
 // POST /api/wallet/refund/:transactionId - Process refund (admin only)
 router.post(
