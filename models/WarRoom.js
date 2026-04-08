@@ -8,6 +8,12 @@ const warRoomSchema = new mongoose.Schema(
             trim: true,
             maxlength: 50,
         },
+        description: {
+            type: String,
+            trim: true,
+            maxlength: 300,
+            default: '',
+        },
         roomCode: {
             type: String,
             required: true,

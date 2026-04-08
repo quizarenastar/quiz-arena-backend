@@ -370,7 +370,6 @@ function initWarRoomSocket(io) {
                 // Apply quiz settings from client payload
                 const quizSettings = {
                     topic: data?.topic || room.settings.topic || 'General Knowledge',
-                    category: data?.category || room.settings.category || 'general-knowledge',
                     difficulty: data?.difficulty || room.settings.difficulty || 'medium',
                     totalQuestions: data?.totalQuestions || room.settings.totalQuestions || 10,
                     timePerQuestion: data?.timePerQuestion || room.settings.timePerQuestion || 30,
@@ -424,10 +423,13 @@ function initWarRoomSocket(io) {
                 try {
                     const { questions } =
                         await aiService.generateQuizQuestions(
-                            quizSettings.topic,
+                            `${quizSettings.topic}${
+                                room.description
+                                    ? ` (Room: ${room.name}. Context: ${room.description})`
+                                    : ` (Room: ${room.name})`
+                            }`,
                             quizSettings.totalQuestions,
-                            quizSettings.difficulty,
-                            quizSettings.category
+                            quizSettings.difficulty
                         );
 
                     // Add timeLimit from settings to each question

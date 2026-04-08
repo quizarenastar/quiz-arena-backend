@@ -20,7 +20,7 @@ jobs:
 
                   script: |
                       if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-                        cd ~/apps/production
+                        cd ~/apps/main
                         git pull origin main
                         npm install
                         pm2 restart prod-backend
