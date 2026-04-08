@@ -65,6 +65,62 @@ class AIService {
         }
     }
 
+    async generateTopicSuggestionsFromContext(context, count = 6) {
+        try {
+            const prompt = `Based on this room context, suggest ${count} concise quiz topics.
+
+Context:
+${context}
+
+Rules:
+- Return only topic names (no numbering, no explanations)
+- Each topic should be 2-6 words
+- Keep topics practical and specific for quiz generation
+- Include a balanced mix (easy to advanced)
+
+Return valid JSON only:
+{
+  "topics": ["topic 1", "topic 2", "topic 3"]
+}`;
+
+            const completion = await this.openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    {
+                        role: 'system',
+                        content:
+                            'You generate concise quiz topic suggestions. Respond with valid JSON only.',
+                    },
+                    { role: 'user', content: prompt },
+                ],
+                temperature: 0.4,
+                max_tokens: 300,
+            });
+
+            const content = completion.choices[0].message.content?.trim() || '';
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error('No JSON in topic suggestions');
+
+            const parsed = JSON.parse(jsonMatch[0]);
+            const topics = Array.isArray(parsed.topics)
+                ? parsed.topics
+                      .map((t) => String(t).trim())
+                      .filter(Boolean)
+                      .slice(0, count)
+                : [];
+
+            if (topics.length === 0) {
+                throw new Error('No valid topics generated');
+            }
+
+            return topics;
+        } catch (error) {
+            const compact = String(context || '').trim();
+            const first = compact.split(/[.|\n]/)[0]?.trim() || 'General Quiz';
+            return [first, 'Core Concepts', 'Practice Set', 'Mixed Aptitude'];
+        }
+    }
+
     inferCategoryFromTopic(topic) {
         const topicLower = topic.toLowerCase();
 
