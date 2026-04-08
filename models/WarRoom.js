@@ -81,7 +81,7 @@ const warRoomSchema = new mongoose.Schema(
             topic: {
                 type: String,
                 trim: true,
-                default: 'General Knowledge',
+                default: '',
             },
             difficulty: {
                 type: String,

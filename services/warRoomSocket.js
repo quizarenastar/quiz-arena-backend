@@ -369,7 +369,10 @@ function initWarRoomSocket(io) {
 
                 // Apply quiz settings from client payload
                 const quizSettings = {
-                    topic: data?.topic || room.settings.topic || 'General Knowledge',
+                    topic:
+                        data?.topic?.trim() ||
+                        room.settings.topic?.trim() ||
+                        room.name,
                     difficulty: data?.difficulty || room.settings.difficulty || 'medium',
                     totalQuestions: data?.totalQuestions || room.settings.totalQuestions || 10,
                     timePerQuestion: data?.timePerQuestion || room.settings.timePerQuestion || 30,

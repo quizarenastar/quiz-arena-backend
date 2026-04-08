@@ -98,7 +98,7 @@ exports.createRoom = async (req, res, next) => {
                 },
             ],
             settings: {
-                topic: settings?.topic || 'General Knowledge',
+                topic: settings?.topic || '',
                 difficulty: settings?.difficulty || 'medium',
                 totalQuestions: Math.min(
                     Math.max(settings?.totalQuestions || 10, 5),
@@ -136,7 +136,7 @@ exports.createRoom = async (req, res, next) => {
 
 /**
  * GET /api/v1/war-rooms/:roomId/suggested-questions
- * Generate AI suggested questions from room context
+ * Generate AI topic suggestions from room context
  */
 exports.getSuggestedQuestions = async (req, res, next) => {
     try {
@@ -165,24 +165,17 @@ exports.getSuggestedQuestions = async (req, res, next) => {
             room.description ? ` - ${room.description}` : ''
         }`;
 
-        const { questions } = await aiService.generateQuizQuestions(
+        const topics = await aiService.generateTopicSuggestionsFromContext(
             contextTopic,
-            5,
-            'medium'
+            6
         );
-
-        const suggestions = questions.map((q) => ({
-            question: q.question,
-            options: q.options,
-            explanation: q.explanation,
-        }));
 
         res.json({
             success: true,
             data: {
-                topicSuggestion: room.name,
+                topicSuggestion: topics[0] || room.name,
                 context: contextTopic,
-                questions: suggestions,
+                topics,
             },
         });
     } catch (err) {
