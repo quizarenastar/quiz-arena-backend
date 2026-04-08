@@ -4,6 +4,7 @@ const WarRoomAttempt = require('../../models/WarRoomAttempt');
 const WarRoomMessage = require('../../models/WarRoomMessage');
 const User = require('../../models/User');
 const { nanoid } = require('nanoid');
+const aiService = require('../../services/aiService');
 const logger = require('../../utils/logger');
 
 /**
@@ -38,7 +39,8 @@ async function generateUniqueCode() {
  */
 exports.createRoom = async (req, res, next) => {
     try {
-        const { name, visibility, maxPlayers, settings } = req.body;
+        const { name, description, visibility, maxPlayers, settings } =
+            req.body;
 
         if (!name || name.trim().length < 2) {
             return res.status(400).json({
@@ -80,6 +82,7 @@ exports.createRoom = async (req, res, next) => {
 
         const room = await WarRoom.create({
             name: name.trim(),
+            description: (description || '').trim().substring(0, 300),
             roomCode,
             visibility: visibility || 'public',
             hostId: req.userId,
@@ -132,6 +135,63 @@ exports.createRoom = async (req, res, next) => {
 };
 
 /**
+ * GET /api/v1/war-rooms/:roomId/suggested-questions
+ * Generate AI suggested questions from room context
+ */
+exports.getSuggestedQuestions = async (req, res, next) => {
+    try {
+        const room = await WarRoom.findById(req.params.roomId).select(
+            'name description members status'
+        );
+
+        if (!room) {
+            return res.status(404).json({
+                success: false,
+                message: 'Room not found',
+            });
+        }
+
+        const isMember = room.members.some(
+            (m) => m.userId.toString() === req.userId
+        );
+        if (!isMember) {
+            return res.status(403).json({
+                success: false,
+                message: 'Only room members can access suggestions',
+            });
+        }
+
+        const contextTopic = `${room.name}${
+            room.description ? ` - ${room.description}` : ''
+        }`;
+
+        const { questions } = await aiService.generateQuizQuestions(
+            contextTopic,
+            5,
+            'medium'
+        );
+
+        const suggestions = questions.map((q) => ({
+            question: q.question,
+            options: q.options,
+            explanation: q.explanation,
+        }));
+
+        res.json({
+            success: true,
+            data: {
+                topicSuggestion: room.name,
+                context: contextTopic,
+                questions: suggestions,
+            },
+        });
+    } catch (err) {
+        logger.error('getSuggestedQuestions error', { error: err.message });
+        next(err);
+    }
+};
+
+/**
  * GET /api/v1/war-rooms/public
  * List public war rooms that are joinable
  */
@@ -152,7 +212,7 @@ exports.getPublicRooms = async (req, res, next) => {
                 .skip(skip)
                 .limit(limit)
                 .select(
-                    'name roomCode status maxPlayers members settings roundNumber lastActivityAt createdAt'
+                    'name description roomCode status maxPlayers members settings roundNumber lastActivityAt createdAt'
                 )
                 .lean(),
             WarRoom.countDocuments(filter),
@@ -226,6 +286,7 @@ exports.getRoomByCode = async (req, res, next) => {
                     data: {
                         _id: room._id,
                         name: room.name,
+                        description: room.description,
                         roomCode: room.roomCode,
                         visibility: room.visibility,
                         status: room.status,

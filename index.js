@@ -103,6 +103,7 @@ app.get('/', async (req, res) => {
             environment: process.env.NODE_ENV,
             db: dbState === 1 ? 'connected' : 'disconnected',
             memoryUsage: process.memoryUsage(),
+            version: '1.0.1',
         };
 
         // If DB is not connected → unhealthy

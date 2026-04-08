@@ -27,6 +27,12 @@ router.post('/:roomId/leave', warRoomController.leaveRoom);
 // Delete a room (host only)
 router.delete('/:roomId', warRoomController.deleteRoom);
 
+// Get AI-suggested questions from room context
+router.get(
+    '/:roomId/suggested-questions',
+    warRoomController.getSuggestedQuestions
+);
+
 // Get quiz history for a room
 router.get('/:roomId/history', warRoomController.getRoomHistory);
 
