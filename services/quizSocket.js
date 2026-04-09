@@ -115,10 +115,15 @@ function initQuizSocket(io) {
                     socket.attemptId = existingAttempt._id.toString();
                     socket.quizId = quizId;
 
+                    // If all questions answered but not finished, signal completion
+                    const allAnswered =
+                        existingAttempt.currentQuestionIndex >=
+                        existingAttempt.questionOrder.length;
+
                     return callback?.({
                         success: true,
                         attemptId: existingAttempt._id,
-                        currentQuestion,
+                        currentQuestion: allAnswered ? null : currentQuestion,
                         currentQuestionIndex:
                             existingAttempt.currentQuestionIndex,
                         totalQuestions: existingAttempt.totalQuestions,
@@ -126,6 +131,7 @@ function initQuizSocket(io) {
                         timeRemaining: Math.max(timeRemaining, 0),
                         quizTitle: quiz.title,
                         resumed: true,
+                        isComplete: allAnswered,
                     });
                 }
 

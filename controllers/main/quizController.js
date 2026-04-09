@@ -1216,7 +1216,7 @@ class QuizController {
             const attempt = await QuizAttempt.findOne({
                 _id: attemptId,
                 userId,
-                status: { $in: ['completed', 'auto-submitted'] },
+                status: { $in: ['completed', 'auto-submitted', 'flagged'] },
             }).populate('quizId');
 
             if (!attempt) {
@@ -1780,10 +1780,11 @@ class QuizController {
                 });
             }
 
-            // Fetch all completed attempts for this quiz
+            // Fetch all completed attempts for this quiz (exclude flagged)
             const attempts = await QuizAttempt.find({
                 quizId,
                 status: { $in: ['completed', 'auto-submitted'] },
+                'antiCheatViolations.severity': { $ne: 'critical' },
             })
                 .populate('userId', 'username email')
                 .lean();
