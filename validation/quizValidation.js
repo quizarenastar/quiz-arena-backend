@@ -47,7 +47,11 @@ exports.createQuizSchema = Joi.object({
         .optional(),
     timeLimit: Joi.number().integer().min(1).max(7200).required(),
     duration: Joi.number().integer().min(1).max(7200).optional(),
-    price: Joi.number().min(0).max(10000).optional(),
+    price: Joi.when('isPaid', {
+        is: true,
+        then: Joi.number().min(5).max(10000).required(),
+        otherwise: Joi.number().min(0).max(10000).optional(),
+    }),
     isPaid: Joi.boolean().optional(),
     startTime: Joi.date().iso().required(),
     endTime: Joi.date().iso().min(Joi.ref('startTime')).required(),
@@ -73,7 +77,7 @@ exports.createQuizSchema = Joi.object({
                     .optional(),
                 points: Joi.number().min(1).optional(),
                 timeLimit: Joi.number().integer().min(5).max(3600).optional(),
-            })
+            }),
         )
         .optional(),
     settings: Joi.object({
@@ -130,9 +134,9 @@ exports.submitAnswersSchema = Joi.object({
                     .pattern(/^[0-9a-fA-F]{24}$/)
                     .required(),
                 selectedOption: Joi.number().integer().min(0).max(3).required(),
-            })
+            }),
         )
-        .min(0)  // Allow empty — one-by-one flow stores answers server-side
+        .min(0) // Allow empty — one-by-one flow stores answers server-side
         .required(),
     timeSpent: Joi.number().integer().min(0).optional(),
     tabSwitches: Joi.number().integer().min(0).optional(),
@@ -213,7 +217,7 @@ exports.transactionFilterSchema = Joi.object({
             'withdrawal',
             'bonus',
             'penalty',
-            'all'
+            'all',
         )
         .optional(),
     startDate: Joi.date().optional(),
