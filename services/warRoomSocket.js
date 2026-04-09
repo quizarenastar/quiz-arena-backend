@@ -32,7 +32,7 @@ function authenticateSocket(socket, next) {
         }
 
         const token = decodeURIComponent(
-            tokenMatch.substring('access_token='.length)
+            tokenMatch.substring('access_token='.length),
         );
         const payload = jwt.verify(token, JWT_SECRET);
         socket.userId = payload.id;
@@ -59,17 +59,24 @@ function initWarRoomSocket(io) {
         let user;
         try {
             user = await User.findById(socket.userId).select(
-                'username profilePicture'
+                'username profilePicture',
             );
             if (!user) {
-                logger.warn('War Room: User not found in DB', { userId: socket.userId });
+                logger.warn('War Room: User not found in DB', {
+                    userId: socket.userId,
+                });
                 socket.emit('war-room:error', { message: 'User not found' });
                 socket.disconnect();
                 return;
             }
-            logger.info('War Room: User loaded', { userId: socket.userId, username: user.username });
+            logger.info('War Room: User loaded', {
+                userId: socket.userId,
+                username: user.username,
+            });
         } catch (err) {
-            logger.error('War Room: Failed to load user', { error: err.message });
+            logger.error('War Room: Failed to load user', {
+                error: err.message,
+            });
             socket.emit('war-room:error', { message: 'Failed to load user' });
             socket.disconnect();
             return;
@@ -83,9 +90,14 @@ function initWarRoomSocket(io) {
 
         // ─── JOIN ROOM ──────────────────────────────────────────
         socket.on('war-room:join', async ({ roomCode }, callback) => {
-            logger.info('war-room:join event received', { roomCode, userId: socket.userData.userId });
+            logger.info('war-room:join event received', {
+                roomCode,
+                userId: socket.userData.userId,
+            });
             try {
-                const room = await WarRoom.findOne({ roomCode: roomCode.toUpperCase() });
+                const room = await WarRoom.findOne({
+                    roomCode: roomCode.toUpperCase(),
+                });
                 if (!room) {
                     return callback?.({ error: 'Room not found' });
                 }
@@ -94,7 +106,7 @@ function initWarRoomSocket(io) {
                 }
 
                 const isMember = room.members.some(
-                    (m) => m.userId.toString() === socket.userData.userId
+                    (m) => m.userId.toString() === socket.userData.userId,
                 );
 
                 if (!isMember) {
@@ -116,12 +128,12 @@ function initWarRoomSocket(io) {
                     // System message
                     await createSystemMessage(
                         room._id,
-                        `${socket.userData.username} joined the room`
+                        `${socket.userData.username} joined the room`,
                     );
                 } else {
                     // Mark existing member as online
                     const member = room.members.find(
-                        (m) => m.userId.toString() === socket.userData.userId
+                        (m) => m.userId.toString() === socket.userData.userId,
                     );
                     if (member) {
                         member.isOnline = true;
@@ -153,7 +165,7 @@ function initWarRoomSocket(io) {
                             ? room.members.find(
                                   (m) =>
                                       m.userId.toString() ===
-                                      socket.userData.userId
+                                      socket.userData.userId,
                               )?.role
                             : 'player',
                         isOnline: true,
@@ -170,8 +182,13 @@ function initWarRoomSocket(io) {
                 });
 
                 // If room is in-progress, send the active quiz state to this user
-                if (freshRoom.status === 'in-progress' && freshRoom.currentQuizId) {
-                    const activeQuiz = await WarRoomQuiz.findById(freshRoom.currentQuizId);
+                if (
+                    freshRoom.status === 'in-progress' &&
+                    freshRoom.currentQuizId
+                ) {
+                    const activeQuiz = await WarRoomQuiz.findById(
+                        freshRoom.currentQuizId,
+                    );
                     if (activeQuiz && activeQuiz.status === 'in-progress') {
                         const sanitizedQuestions = activeQuiz.questions.map(
                             (q, idx) => ({
@@ -180,22 +197,31 @@ function initWarRoomSocket(io) {
                                 options: q.options,
                                 timeLimit: q.timeLimit,
                                 points: q.points,
-                            })
+                            }),
                         );
-                        
+
                         let elapsedSeconds = 0;
                         if (activeQuiz.startedAt) {
-                            elapsedSeconds = Math.floor((Date.now() - new Date(activeQuiz.startedAt).getTime()) / 1000);
+                            elapsedSeconds = Math.floor(
+                                (Date.now() -
+                                    new Date(activeQuiz.startedAt).getTime()) /
+                                    1000,
+                            );
                         }
-                        const remainingDuration = Math.max(0, activeQuiz.duration - elapsedSeconds);
+                        const remainingDuration = Math.max(
+                            0,
+                            activeQuiz.duration - elapsedSeconds,
+                        );
 
                         // Find existing attempt for this user
                         const attempt = await WarRoomAttempt.findOne({
                             warRoomQuizId: activeQuiz._id,
-                            userId: socket.userData.userId
+                            userId: socket.userData.userId,
                         });
 
-                        const answeredQuestionIndices = attempt ? attempt.answers.map(a => a.questionIndex) : [];
+                        const answeredQuestionIndices = attempt
+                            ? attempt.answers.map((a) => a.questionIndex)
+                            : [];
                         const currentScore = attempt ? attempt.score : 0;
 
                         socket.emit('war-room:quiz-start', {
@@ -208,7 +234,7 @@ function initWarRoomSocket(io) {
                             questions: sanitizedQuestions,
                             startedAt: activeQuiz.startedAt,
                             answeredQuestionIndices,
-                            currentScore
+                            currentScore,
                         });
                     }
                 }
@@ -231,7 +257,7 @@ function initWarRoomSocket(io) {
                 if (!room) return callback?.({ error: 'Room not found' });
 
                 const member = room.members.find(
-                    (m) => m.userId.toString() === socket.userData.userId
+                    (m) => m.userId.toString() === socket.userData.userId,
                 );
                 if (!member) return callback?.({ error: 'Not a member' });
 
@@ -239,10 +265,12 @@ function initWarRoomSocket(io) {
                 room.lastActivityAt = new Date();
                 await room.save();
 
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:member-ready', {
-                    userId: socket.userData.userId,
-                    isReady,
-                });
+                warRoomNs
+                    .to(socket.currentRoomCode)
+                    .emit('war-room:member-ready', {
+                        userId: socket.userData.userId,
+                        isReady,
+                    });
 
                 callback?.({ success: true });
             } catch (err) {
@@ -252,46 +280,58 @@ function initWarRoomSocket(io) {
         });
 
         // ─── UPDATE SETTINGS (Host only) ────────────────────────
-        socket.on('war-room:update-settings', async ({ settings }, callback) => {
-            try {
-                const room = await WarRoom.findById(socket.currentRoomId);
-                if (!room) return callback?.({ error: 'Room not found' });
-                if (room.hostId.toString() !== socket.userData.userId) {
-                    return callback?.({ error: 'Only the host can change settings' });
-                }
-                if (room.status !== 'waiting' && room.status !== 'finished') {
-                    return callback?.({ error: 'Cannot change settings during a quiz' });
-                }
-
-                // Apply settings
-                const allowed = [
-                    'topic',
-                    'difficulty',
-                    'totalQuestions',
-                    'timePerQuestion',
-                    'category',
-                    'countdownSeconds',
-                ];
-                for (const key of allowed) {
-                    if (settings[key] !== undefined) {
-                        room.settings[key] = settings[key];
+        socket.on(
+            'war-room:update-settings',
+            async ({ settings }, callback) => {
+                try {
+                    const room = await WarRoom.findById(socket.currentRoomId);
+                    if (!room) return callback?.({ error: 'Room not found' });
+                    if (room.hostId.toString() !== socket.userData.userId) {
+                        return callback?.({
+                            error: 'Only the host can change settings',
+                        });
                     }
+                    if (
+                        room.status !== 'waiting' &&
+                        room.status !== 'finished'
+                    ) {
+                        return callback?.({
+                            error: 'Cannot change settings during a quiz',
+                        });
+                    }
+
+                    // Apply settings
+                    const allowed = [
+                        'topic',
+                        'difficulty',
+                        'totalQuestions',
+                        'timePerQuestion',
+                        'category',
+                        'countdownSeconds',
+                    ];
+                    for (const key of allowed) {
+                        if (settings[key] !== undefined) {
+                            room.settings[key] = settings[key];
+                        }
+                    }
+                    room.lastActivityAt = new Date();
+                    await room.save();
+
+                    warRoomNs
+                        .to(socket.currentRoomCode)
+                        .emit('war-room:settings-updated', {
+                            settings: room.settings,
+                        });
+
+                    callback?.({ success: true, settings: room.settings });
+                } catch (err) {
+                    logger.error('war-room:update-settings error', {
+                        error: err.message,
+                    });
+                    callback?.({ error: 'Failed to update settings' });
                 }
-                room.lastActivityAt = new Date();
-                await room.save();
-
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:settings-updated', {
-                    settings: room.settings,
-                });
-
-                callback?.({ success: true, settings: room.settings });
-            } catch (err) {
-                logger.error('war-room:update-settings error', {
-                    error: err.message,
-                });
-                callback?.({ error: 'Failed to update settings' });
-            }
-        });
+            },
+        );
 
         // ─── KICK PLAYER (Host only) ────────────────────────────
         socket.on('war-room:kick', async ({ targetUserId }, callback) => {
@@ -299,35 +339,42 @@ function initWarRoomSocket(io) {
                 const room = await WarRoom.findById(socket.currentRoomId);
                 if (!room) return callback?.({ error: 'Room not found' });
                 if (room.hostId.toString() !== socket.userData.userId) {
-                    return callback?.({ error: 'Only the host can kick players' });
+                    return callback?.({
+                        error: 'Only the host can kick players',
+                    });
                 }
                 if (targetUserId === socket.userData.userId) {
                     return callback?.({ error: 'Cannot kick yourself' });
                 }
 
                 const targetMember = room.members.find(
-                    (m) => m.userId.toString() === targetUserId
+                    (m) => m.userId.toString() === targetUserId,
                 );
-                if (!targetMember) return callback?.({ error: 'Player not found' });
+                if (!targetMember)
+                    return callback?.({ error: 'Player not found' });
 
                 room.members = room.members.filter(
-                    (m) => m.userId.toString() !== targetUserId
+                    (m) => m.userId.toString() !== targetUserId,
                 );
                 room.lastActivityAt = new Date();
                 await room.save();
 
                 await createSystemMessage(
                     room._id,
-                    `${targetMember.username} was removed from the room`
+                    `${targetMember.username} was removed from the room`,
                 );
 
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:member-kicked', {
-                    userId: targetUserId,
-                    username: targetMember.username,
-                });
+                warRoomNs
+                    .to(socket.currentRoomCode)
+                    .emit('war-room:member-kicked', {
+                        userId: targetUserId,
+                        username: targetMember.username,
+                    });
 
                 // Disconnect the kicked player's socket from the room
-                const sockets = await warRoomNs.in(socket.currentRoomCode).fetchSockets();
+                const sockets = await warRoomNs
+                    .in(socket.currentRoomCode)
+                    .fetchSockets();
                 for (const s of sockets) {
                     if (s.userData?.userId === targetUserId) {
                         s.leave(socket.currentRoomCode);
@@ -354,7 +401,9 @@ function initWarRoomSocket(io) {
                 const room = await WarRoom.findById(socket.currentRoomId);
                 if (!room) return callback?.({ error: 'Room not found' });
                 if (room.hostId.toString() !== socket.userData.userId) {
-                    return callback?.({ error: 'Only the host can start the quiz' });
+                    return callback?.({
+                        error: 'Only the host can start the quiz',
+                    });
                 }
                 if (room.status !== 'waiting' && room.status !== 'finished') {
                     return callback?.({ error: 'Quiz already in progress' });
@@ -373,9 +422,18 @@ function initWarRoomSocket(io) {
                         data?.topic?.trim() ||
                         room.settings.topic?.trim() ||
                         room.name,
-                    difficulty: data?.difficulty || room.settings.difficulty || 'medium',
-                    totalQuestions: data?.totalQuestions || room.settings.totalQuestions || 10,
-                    timePerQuestion: data?.timePerQuestion || room.settings.timePerQuestion || 30,
+                    difficulty:
+                        data?.difficulty ||
+                        room.settings.difficulty ||
+                        'medium',
+                    totalQuestions:
+                        data?.totalQuestions ||
+                        room.settings.totalQuestions ||
+                        10,
+                    timePerQuestion:
+                        data?.timePerQuestion ||
+                        room.settings.timePerQuestion ||
+                        30,
                     countdownSeconds: room.settings.countdownSeconds || 5,
                 };
 
@@ -389,22 +447,26 @@ function initWarRoomSocket(io) {
 
                 await createSystemMessage(
                     room._id,
-                    `Quiz is starting in ${quizSettings.countdownSeconds} seconds!`
+                    `Quiz is starting in ${quizSettings.countdownSeconds} seconds!`,
                 );
 
                 // Countdown
                 const countdownSecs = quizSettings.countdownSeconds;
                 for (let i = countdownSecs; i >= 1; i--) {
-                    warRoomNs.to(socket.currentRoomCode).emit('war-room:countdown', {
-                        seconds: i,
-                    });
+                    warRoomNs
+                        .to(socket.currentRoomCode)
+                        .emit('war-room:countdown', {
+                            seconds: i,
+                        });
                     await sleep(1000);
                 }
 
                 // Generate quiz with AI
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:generating', {
-                    message: 'Generating quiz questions...',
-                });
+                warRoomNs
+                    .to(socket.currentRoomCode)
+                    .emit('war-room:generating', {
+                        message: 'Generating quiz questions...',
+                    });
 
                 const newRound = room.roundNumber + 1;
 
@@ -424,16 +486,15 @@ function initWarRoomSocket(io) {
                 });
 
                 try {
-                    const { questions } =
-                        await aiService.generateQuizQuestions(
-                            `${quizSettings.topic}${
-                                room.description
-                                    ? ` (Room: ${room.name}. Context: ${room.description})`
-                                    : ` (Room: ${room.name})`
-                            }`,
-                            quizSettings.totalQuestions,
-                            quizSettings.difficulty
-                        );
+                    const { questions } = await aiService.generateQuizQuestions(
+                        `${quizSettings.topic}${
+                            room.description
+                                ? ` (Room: ${room.name}. Context: ${room.description})`
+                                : ` (Room: ${room.name})`
+                        }`,
+                        quizSettings.totalQuestions,
+                        quizSettings.difficulty,
+                    );
 
                     // Add timeLimit from settings to each question
                     const formattedQuestions = questions.map((q) => ({
@@ -453,10 +514,12 @@ function initWarRoomSocket(io) {
                     await warRoomQuiz.save();
                     room.status = 'waiting';
                     await room.save();
-                    warRoomNs.to(socket.currentRoomCode).emit('war-room:error', {
-                        message:
-                            'Failed to generate quiz. Please try again.',
-                    });
+                    warRoomNs
+                        .to(socket.currentRoomCode)
+                        .emit('war-room:error', {
+                            message:
+                                'Failed to generate quiz. Please try again.',
+                        });
                     return;
                 }
 
@@ -484,8 +547,8 @@ function initWarRoomSocket(io) {
                             userId,
                             totalQuestions: warRoomQuiz.totalQuestions,
                             startedAt: new Date(),
-                        })
-                    )
+                        }),
+                    ),
                 );
 
                 // Send questions to all players (without correct answers)
@@ -496,21 +559,26 @@ function initWarRoomSocket(io) {
                         options: q.options,
                         timeLimit: q.timeLimit,
                         points: q.points,
-                    })
+                    }),
                 );
 
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:quiz-start', {
-                    quizId: warRoomQuiz._id,
-                    roundNumber: newRound,
-                    topic: warRoomQuiz.topic,
-                    difficulty: warRoomQuiz.difficulty,
-                    totalQuestions: warRoomQuiz.totalQuestions,
-                    duration: warRoomQuiz.duration,
-                    questions: sanitizedQuestions,
-                    startedAt: warRoomQuiz.startedAt,
-                });
+                warRoomNs
+                    .to(socket.currentRoomCode)
+                    .emit('war-room:quiz-start', {
+                        quizId: warRoomQuiz._id,
+                        roundNumber: newRound,
+                        topic: warRoomQuiz.topic,
+                        difficulty: warRoomQuiz.difficulty,
+                        totalQuestions: warRoomQuiz.totalQuestions,
+                        duration: warRoomQuiz.duration,
+                        questions: sanitizedQuestions,
+                        startedAt: warRoomQuiz.startedAt,
+                    });
 
-                await createSystemMessage(room._id, `Round ${newRound} has started!`);
+                await createSystemMessage(
+                    room._id,
+                    `Round ${newRound} has started!`,
+                );
 
                 // Set auto-submit timer for the entire quiz duration
                 const totalDurationMs = warRoomQuiz.duration * 1000 + 3000; // +3s buffer
@@ -519,7 +587,7 @@ function initWarRoomSocket(io) {
                         warRoomQuiz._id,
                         room._id,
                         socket.currentRoomCode,
-                        warRoomNs
+                        warRoomNs,
                     );
                 }, totalDurationMs);
             } catch (err) {
@@ -531,73 +599,80 @@ function initWarRoomSocket(io) {
         });
 
         // ─── SUBMIT ANSWER ──────────────────────────────────────
-        socket.on('war-room:submit-answer', async ({ quizId, questionIndex, selectedAnswer, timeSpent }, callback) => {
-            try {
-                const attempt = await WarRoomAttempt.findOne({
-                    warRoomQuizId: quizId,
-                    userId: socket.userData.userId,
-                });
-                if (!attempt || attempt.status !== 'in-progress') {
-                    return callback?.({ error: 'No active attempt found' });
+        socket.on(
+            'war-room:submit-answer',
+            async (
+                { quizId, questionIndex, selectedAnswer, timeSpent },
+                callback,
+            ) => {
+                try {
+                    const attempt = await WarRoomAttempt.findOne({
+                        warRoomQuizId: quizId,
+                        userId: socket.userData.userId,
+                    });
+                    if (!attempt || attempt.status !== 'in-progress') {
+                        return callback?.({ error: 'No active attempt found' });
+                    }
+
+                    const quiz = await WarRoomQuiz.findById(quizId);
+                    if (!quiz) return callback?.({ error: 'Quiz not found' });
+
+                    const question = quiz.questions[questionIndex];
+                    if (!question)
+                        return callback?.({ error: 'Invalid question index' });
+
+                    // Check if already answered
+                    const existing = attempt.answers.find(
+                        (a) => a.questionIndex === questionIndex,
+                    );
+                    if (existing) {
+                        return callback?.({
+                            error: 'Already answered this question',
+                        });
+                    }
+
+                    const isCorrect = selectedAnswer === question.correctAnswer;
+                    const pointsEarned = isCorrect ? question.points : 0;
+
+                    attempt.answers.push({
+                        questionIndex,
+                        selectedAnswer,
+                        isCorrect,
+                        timeSpent: timeSpent || 0,
+                    });
+
+                    if (isCorrect) {
+                        attempt.correctAnswers += 1;
+                        attempt.score += pointsEarned;
+                    }
+                    attempt.totalTime += timeSpent || 0;
+                    attempt.percentage =
+                        (attempt.correctAnswers / attempt.totalQuestions) * 100;
+
+                    await attempt.save();
+
+                    // Broadcast progress to room
+                    warRoomNs
+                        .to(socket.currentRoomCode)
+                        .emit('war-room:progress-update', {
+                            userId: socket.userData.userId,
+                            username: socket.userData.username,
+                            answeredCount: attempt.answers.length,
+                            totalQuestions: attempt.totalQuestions,
+                            currentScore: attempt.score,
+                        });
+
+                    callback?.({
+                        success: true,
+                    });
+                } catch (err) {
+                    logger.error('war-room:submit-answer error', {
+                        error: err.message,
+                    });
+                    callback?.({ error: 'Failed to submit answer' });
                 }
-
-                const quiz = await WarRoomQuiz.findById(quizId);
-                if (!quiz) return callback?.({ error: 'Quiz not found' });
-
-                const question = quiz.questions[questionIndex];
-                if (!question) return callback?.({ error: 'Invalid question index' });
-
-                // Check if already answered
-                const existing = attempt.answers.find(
-                    (a) => a.questionIndex === questionIndex
-                );
-                if (existing) {
-                    return callback?.({ error: 'Already answered this question' });
-                }
-
-                const isCorrect = selectedAnswer === question.correctAnswer;
-                const pointsEarned = isCorrect ? question.points : 0;
-
-                attempt.answers.push({
-                    questionIndex,
-                    selectedAnswer,
-                    isCorrect,
-                    timeSpent: timeSpent || 0,
-                });
-
-                if (isCorrect) {
-                    attempt.correctAnswers += 1;
-                    attempt.score += pointsEarned;
-                }
-                attempt.totalTime += timeSpent || 0;
-                attempt.percentage =
-                    (attempt.correctAnswers / attempt.totalQuestions) * 100;
-
-                await attempt.save();
-
-                // Broadcast progress to room
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:progress-update', {
-                    userId: socket.userData.userId,
-                    username: socket.userData.username,
-                    answeredCount: attempt.answers.length,
-                    totalQuestions: attempt.totalQuestions,
-                    currentScore: attempt.score,
-                });
-
-                callback?.({
-                    success: true,
-                    isCorrect,
-                    correctAnswer: question.correctAnswer,
-                    explanation: question.explanation,
-                    score: attempt.score,
-                });
-            } catch (err) {
-                logger.error('war-room:submit-answer error', {
-                    error: err.message,
-                });
-                callback?.({ error: 'Failed to submit answer' });
-            }
-        });
+            },
+        );
 
         // ─── FINISH QUIZ (Player done) ──────────────────────────
         socket.on('war-room:finish-quiz', async ({ quizId }, callback) => {
@@ -605,42 +680,68 @@ function initWarRoomSocket(io) {
                 const attempt = await WarRoomAttempt.findOne({
                     warRoomQuizId: quizId,
                     userId: socket.userData.userId,
-                    status: 'in-progress',
                 });
                 if (!attempt) {
-                    return callback?.({ error: 'No active attempt' });
+                    return callback?.({ error: 'No attempt found' });
                 }
 
-                attempt.status = 'completed';
-                attempt.completedAt = new Date();
-                await attempt.save();
+                const wasInProgress = attempt.status === 'in-progress';
+                if (wasInProgress) {
+                    attempt.status = 'completed';
+                    attempt.completedAt = new Date();
+                    await attempt.save();
+                }
 
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:player-finished', {
-                    userId: socket.userData.userId,
-                    username: socket.userData.username,
-                    score: attempt.score,
-                    correctAnswers: attempt.correctAnswers,
-                    totalTime: attempt.totalTime,
-                });
-
-                // Check if all players have finished
+                // Check all players' status
                 const allAttempts = await WarRoomAttempt.find({
                     warRoomQuizId: quizId,
                 });
-                const allDone = allAttempts.every(
-                    (a) => a.status !== 'in-progress'
-                );
+                const finishedCount = allAttempts.filter(
+                    (a) => a.status !== 'in-progress',
+                ).length;
+                const totalPlayers = allAttempts.length;
 
-                if (allDone) {
-                    await finalizeRound(
-                        quizId,
-                        socket.currentRoomId,
-                        socket.currentRoomCode,
-                        warRoomNs
-                    );
+                if (wasInProgress) {
+                    warRoomNs
+                        .to(socket.currentRoomCode)
+                        .emit('war-room:player-finished', {
+                            userId: socket.userData.userId,
+                            username: socket.userData.username,
+                            score: attempt.score,
+                            correctAnswers: attempt.correctAnswers,
+                            totalTime: attempt.totalTime,
+                            finishedCount,
+                            totalPlayers,
+                        });
+
+                    const allDone = finishedCount === totalPlayers;
+                    if (allDone) {
+                        await finalizeRound(
+                            quizId,
+                            socket.currentRoomId,
+                            socket.currentRoomCode,
+                            warRoomNs,
+                        );
+                    }
                 }
 
-                callback?.({ success: true });
+                // Send questions with correct answers for review
+                const quiz = await WarRoomQuiz.findById(quizId);
+                const questionsWithAnswers = quiz.questions.map((q, idx) => ({
+                    index: idx,
+                    question: q.question,
+                    options: q.options,
+                    correctAnswer: q.correctAnswer,
+                    explanation: q.explanation,
+                }));
+
+                callback?.({
+                    success: true,
+                    questions: questionsWithAnswers,
+                    userAnswers: attempt.answers,
+                    finishedCount,
+                    totalPlayers,
+                });
             } catch (err) {
                 logger.error('war-room:finish-quiz error', {
                     error: err.message,
@@ -683,15 +784,17 @@ function initWarRoomSocket(io) {
                 room.lastActivityAt = new Date();
                 await room.save();
 
-                warRoomNs.to(socket.currentRoomCode).emit('war-room:chat-message', {
-                    _id: chatMsg._id,
-                    userId: socket.userData.userId,
-                    username: socket.userData.username,
-                    profilePicture: socket.userData.profilePicture,
-                    message: chatMsg.message,
-                    type: 'chat',
-                    createdAt: chatMsg.createdAt,
-                });
+                warRoomNs
+                    .to(socket.currentRoomCode)
+                    .emit('war-room:chat-message', {
+                        _id: chatMsg._id,
+                        userId: socket.userData.userId,
+                        username: socket.userData.username,
+                        profilePicture: socket.userData.profilePicture,
+                        message: chatMsg.message,
+                        type: 'chat',
+                        createdAt: chatMsg.createdAt,
+                    });
 
                 callback?.({ success: true });
             } catch (err) {
@@ -722,7 +825,7 @@ async function handleLeaveRoom(socket, warRoomNs, isDisconnect = false) {
         if (!room) return;
 
         const member = room.members.find(
-            (m) => m.userId.toString() === socket.userData.userId
+            (m) => m.userId.toString() === socket.userData.userId,
         );
         if (!member) return;
 
@@ -740,7 +843,7 @@ async function handleLeaveRoom(socket, warRoomNs, isDisconnect = false) {
         } else {
             // Actually remove from room
             room.members = room.members.filter(
-                (m) => m.userId.toString() !== socket.userData.userId
+                (m) => m.userId.toString() !== socket.userData.userId,
             );
             room.lastActivityAt = new Date();
 
@@ -755,7 +858,7 @@ async function handleLeaveRoom(socket, warRoomNs, isDisconnect = false) {
 
                 await createSystemMessage(
                     room._id,
-                    `${socket.userData.username} left. ${newHost.username} is now the host.`
+                    `${socket.userData.username} left. ${newHost.username} is now the host.`,
                 );
             } else if (room.members.length === 0) {
                 room.status = 'closed';
@@ -765,7 +868,7 @@ async function handleLeaveRoom(socket, warRoomNs, isDisconnect = false) {
 
             await createSystemMessage(
                 room._id,
-                `${socket.userData.username} left the room`
+                `${socket.userData.username} left the room`,
             );
 
             warRoomNs.to(socket.currentRoomCode).emit('war-room:member-left', {
@@ -871,7 +974,7 @@ async function finalizeRound(quizId, roomId, roomCode, warRoomNs) {
 
         await createSystemMessage(
             roomId,
-            `Round ${quiz.roundNumber} complete! 🏆 Winner: ${results[0]?.username || 'No one'}`
+            `Round ${quiz.roundNumber} complete! 🏆 Winner: ${results[0]?.username || 'No one'}`,
         );
 
         // Include questions with answers for review
