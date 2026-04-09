@@ -501,7 +501,8 @@ class QuizController {
         }
     }
 
-    // Start quiz attempt — returns only the FIRST question
+    // startAttempt — Moved to WebSocket (quizSocket.js)
+    /*
     async startAttempt(req, res) {
         try {
             const { quizId } = req.params;
@@ -675,8 +676,11 @@ class QuizController {
             });
         }
     }
+    */
 
     // Submit answer for a single question and get the next one
+    // submitSingleAnswer — Moved to WebSocket (quizSocket.js)
+    /*
     async submitSingleAnswer(req, res) {
         try {
             const { attemptId } = req.params;
@@ -1083,6 +1087,7 @@ class QuizController {
             });
         }
     }
+    */
 
     // Get user's quiz attempts
     async getUserAttempts(req, res) {
