@@ -9,6 +9,7 @@ const mongoose = require('mongoose');
 const logger = require('./utils/logger');
 const { MONGODB_URI } = require('./configs');
 const initWarRoomSocket = require('./services/warRoomSocket');
+const initQuizSocket = require('./services/quizSocket');
 const PORT = process.env.PORT || 5000;
 
 const app = express();
@@ -51,6 +52,10 @@ async function main() {
         // Initialize War Room WebSocket handler
         initWarRoomSocket(io);
         logger.info('✅ War Room WebSocket initialized');
+
+        // Initialize Quiz WebSocket handler
+        initQuizSocket(io);
+        logger.info('✅ Quiz WebSocket initialized');
 
         // Start the server *after* successful DB connection
         server.listen(PORT, () => {

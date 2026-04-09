@@ -5,11 +5,11 @@ const {
     createQuizSchema,
     updateQuizSchema,
     generateQuestionsSchema,
-    submitAnswersSchema,
-    singleAnswerSchema,
+    // submitAnswersSchema,   // Moved to WebSocket (quizSocket.js)
+    // singleAnswerSchema,    // Moved to WebSocket (quizSocket.js)
     addQuestionSchema,
     updateQuestionSchema,
-    violationSchema,
+    // violationSchema,       // Moved to WebSocket (quizSocket.js)
     quizFilterSchema,
 } = require('../../validation/quizValidation');
 const {
@@ -56,7 +56,6 @@ router.get(
     quizController.getQuizLeaderboard,
 );
 
-
 // Protected routes (authentication required)
 router.use(verifyUser);
 
@@ -82,8 +81,11 @@ router.get(
 );
 
 router.get('/:quizId', validateMongoId('quizId'), quizController.getQuiz);
-router.get('/:quizId/leaderboard', validateMongoId('quizId'), quizController.getQuizLeaderboard);
-
+router.get(
+    '/:quizId/leaderboard',
+    validateMongoId('quizId'),
+    quizController.getQuizLeaderboard,
+);
 
 router.put(
     '/:quizId',
@@ -140,13 +142,13 @@ router.post(
     quizController.registerForQuiz,
 );
 
-// Quiz attempt routes
-router.post(
-    '/:quizId/start',
-    quizAttemptLimit,
-    validateMongoId('quizId'),
-    quizController.startAttempt,
-);
+// Quiz attempt routes — moved to WebSocket (quizSocket.js)
+// router.post(
+//     '/:quizId/start',
+//     quizAttemptLimit,
+//     validateMongoId('quizId'),
+//     quizController.startAttempt,
+// );
 
 // User attempt history - MUST come before dynamic :attemptId routes
 router.get(
@@ -155,33 +157,33 @@ router.get(
     quizController.getUserAttempts,
 );
 
-router.post(
-    '/attempts/:attemptId/violation',
-    validateMongoId('attemptId'),
-    validateBody(violationSchema),
-    quizController.recordViolation,
-);
-
-// One-by-one question flow
-router.post(
-    '/attempts/:attemptId/answer',
-    validateMongoId('attemptId'),
-    validateBody(singleAnswerSchema),
-    quizController.submitSingleAnswer,
-);
-
-router.get(
-    '/attempts/:attemptId/current-question',
-    validateMongoId('attemptId'),
-    quizController.getNextQuestion,
-);
-
-router.post(
-    '/attempts/:attemptId/submit',
-    validateMongoId('attemptId'),
-    validateBody(submitAnswersSchema),
-    quizController.submitAttempt,
-);
+// Moved to WebSocket (quizSocket.js)
+// router.post(
+//     '/attempts/:attemptId/violation',
+//     validateMongoId('attemptId'),
+//     validateBody(violationSchema),
+//     quizController.recordViolation,
+// );
+//
+// router.post(
+//     '/attempts/:attemptId/answer',
+//     validateMongoId('attemptId'),
+//     validateBody(singleAnswerSchema),
+//     quizController.submitSingleAnswer,
+// );
+//
+// router.get(
+//     '/attempts/:attemptId/current-question',
+//     validateMongoId('attemptId'),
+//     quizController.getNextQuestion,
+// );
+//
+// router.post(
+//     '/attempts/:attemptId/submit',
+//     validateMongoId('attemptId'),
+//     validateBody(submitAnswersSchema),
+//     quizController.submitAttempt,
+// );
 
 router.get(
     '/attempts/:attemptId/analysis',
