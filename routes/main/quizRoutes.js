@@ -39,6 +39,18 @@ const quizAttemptLimit = rateLimit({
     },
 });
 
+// Rate limiting for AI generation endpoints (expensive OpenAI calls)
+const aiGenerationLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 AI generations per 15 minutes per user
+    message: {
+        success: false,
+        message: 'Too many AI generation requests. Please try again later.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 // Public routes (no authentication required)
 router.get(
     '/public',
@@ -62,6 +74,7 @@ router.use(verifyUser);
 // AI question generation preview (no quiz creation)
 router.post(
     '/generate-preview',
+    aiGenerationLimit,
     validateBody(generateQuestionsSchema),
     quizController.generateQuestionsPreview,
 );
@@ -122,6 +135,7 @@ router.delete(
 // AI question generation
 router.post(
     '/:quizId/generate-questions',
+    aiGenerationLimit,
     validateMongoId('quizId'),
     validateBody(generateQuestionsSchema),
     quizController.generateQuestions,
