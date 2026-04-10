@@ -1,7 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const verifyUser = require('../../middlewares/verifyUser');
 const warRoomController = require('../../controllers/main/warRoomController');
+
+// Rate limiting for AI suggestion endpoints
+const aiSuggestionLimit = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 15, // 15 suggestion requests per 15 minutes per user
+    message: {
+        success: false,
+        message: 'Too many AI suggestion requests. Please try again later.',
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
 
 // All war room routes require authentication
 router.use(verifyUser);
@@ -30,7 +43,8 @@ router.delete('/:roomId', warRoomController.deleteRoom);
 // Get AI-suggested questions from room context
 router.get(
     '/:roomId/suggested-questions',
-    warRoomController.getSuggestedQuestions
+    aiSuggestionLimit,
+    warRoomController.getSuggestedQuestions,
 );
 
 // Get quiz history for a room

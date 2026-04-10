@@ -8,22 +8,70 @@ class AIService {
         });
     }
 
+    /**
+     * Sanitize user-provided topic/context to prevent prompt injection.
+     * Strips control characters, known injection patterns, and enforces length.
+     */
+    sanitizeTopicInput(input, maxLength = 200) {
+        if (!input || typeof input !== 'string') return '';
+
+        let sanitized = input
+            // Remove control characters
+            .replace(/[\x00-\x1F\x7F]/g, '')
+            // Collapse whitespace
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Strip common prompt injection patterns (case-insensitive)
+        const injectionPatterns = [
+            /ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?|context)/gi,
+            /disregard\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?|context)/gi,
+            /forget\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?|context)/gi,
+            /you\s+are\s+now\s+/gi,
+            /act\s+as\s+(if|a|an)?\s*/gi,
+            /pretend\s+(you\s+are|to\s+be)/gi,
+            /system\s*:\s*/gi,
+            /\[\s*system\s*\]/gi,
+            /<<\s*sys\s*>>/gi,
+            /\bdo\s+not\s+follow\b/gi,
+            /override\s+(your|the|all)\s+(instructions?|rules?|prompts?)/gi,
+            /new\s+instructions?\s*:/gi,
+            /respond\s+(only\s+)?with\b/gi,
+            /output\s+(only\s+)?the\b/gi,
+        ];
+
+        for (const pattern of injectionPatterns) {
+            sanitized = sanitized.replace(pattern, '');
+        }
+
+        // Enforce max length
+        sanitized = sanitized.slice(0, maxLength).trim();
+
+        return sanitized;
+    }
+
     async generateQuizQuestions(
         topic,
         numQuestions,
         difficulty = 'medium',
-        category = null
+        category = null,
     ) {
         try {
+            // Sanitize user-provided topic to prevent prompt injection
+            const sanitizedTopic = this.sanitizeTopicInput(topic);
+            if (!sanitizedTopic) {
+                throw new Error('Invalid or empty topic after sanitization');
+            }
+
             // Infer category from topic if not provided
             const inferredCategory =
-                category || this.inferCategoryFromTopic(topic);
+                category || this.inferCategoryFromTopic(sanitizedTopic);
 
             const prompt = this.createQuizGenerationPrompt(
-                topic,
+                sanitizedTopic,
                 numQuestions,
                 difficulty,
-                inferredCategory
+                inferredCategory,
             );
 
             const completion = await this.openai.chat.completions.create({
@@ -50,8 +98,8 @@ class AIService {
 
             const formattedQuestions = this.validateAndFormatQuestions(
                 questions,
-                topic,
-                difficulty
+                sanitizedTopic,
+                difficulty,
             );
 
             // Return both questions and the inferred category
@@ -67,10 +115,16 @@ class AIService {
 
     async generateTopicSuggestionsFromContext(context, count = 6) {
         try {
+            // Sanitize user-provided context to prevent prompt injection
+            const sanitizedContext = this.sanitizeTopicInput(context, 300);
+            if (!sanitizedContext) {
+                throw new Error('Invalid or empty context after sanitization');
+            }
+
             const prompt = `Based on this room context, suggest ${count} concise quiz topics.
 
 Context:
-${context}
+${sanitizedContext}
 
 Rules:
 - Return only topic names (no numbering, no explanations)
@@ -336,8 +390,13 @@ Difficulty: ${difficulty}`;
 
     async enhanceQuestion(questionText, topic) {
         try {
-            const prompt = `Improve this quiz question about ${topic}:
-"${questionText}"
+            const sanitizedTopic = this.sanitizeTopicInput(topic);
+            const sanitizedQuestion = this.sanitizeTopicInput(
+                questionText,
+                500,
+            );
+            const prompt = `Improve this quiz question about ${sanitizedTopic}:
+"${sanitizedQuestion}"
 
 Make it clearer, more engaging, and educationally valuable while maintaining the same difficulty level. Return only the improved question text.`;
 
@@ -371,7 +430,7 @@ Make it clearer, more engaging, and educationally valuable while maintaining the
             .filter((a) => !a.isCorrect)
             .map((a) => {
                 const question = questions.find(
-                    (q) => q._id.toString() === a.questionId.toString()
+                    (q) => q._id.toString() === a.questionId.toString(),
                 );
                 return {
                     question: question?.question,
@@ -395,10 +454,10 @@ Make it clearer, more engaging, and educationally valuable while maintaining the
         Performance Summary:
         - Score: ${score} points
         - Correct Answers: ${correctAnswers}/${totalQuestions} (${performanceData.percentage.toFixed(
-            1
+            1,
         )}%)
         - Average Time per Question: ${performanceData.avgTimePerQuestion.toFixed(
-            1
+            1,
         )} seconds
         - Anti-cheat Violations: ${performanceData.violationsCount}
 
@@ -459,13 +518,13 @@ Make it clearer, more engaging, and educationally valuable while maintaining the
 
         return {
             overallAssessment: `You scored ${percentage.toFixed(
-                1
+                1,
             )}% on this quiz. ${
                 percentage >= 80
                     ? 'Excellent work!'
                     : percentage >= 60
-                    ? 'Good effort!'
-                    : 'Keep practicing!'
+                      ? 'Good effort!'
+                      : 'Keep practicing!'
             }`,
             strengths:
                 percentage >= 60
@@ -499,7 +558,7 @@ Make it clearer, more engaging, and educationally valuable while maintaining the
         // Analyze question topics and performance
         const topicPerformance = this.calculateTopicPerformance(
             attempt,
-            questions
+            questions,
         );
 
         return `Analyze this quiz attempt and provide detailed insights:
@@ -516,7 +575,7 @@ ${Object.entries(topicPerformance)
             `- ${topic}: ${data.correct}/${data.total} correct (${(
                 (data.correct / data.total) *
                 100
-            ).toFixed(1)}%)`
+            ).toFixed(1)}%)`,
     )
     .join('\n')}
 
@@ -552,7 +611,7 @@ Provide analysis in this JSON format:
 
         attempt.answers.forEach((answer) => {
             const question = questions.find(
-                (q) => q._id.toString() === answer.questionId.toString()
+                (q) => q._id.toString() === answer.questionId.toString(),
             );
             if (question) {
                 const topic = question.topic || 'General';
@@ -595,8 +654,8 @@ Provide analysis in this JSON format:
                 percentage >= 80
                     ? 'good'
                     : percentage >= 60
-                    ? 'average'
-                    : 'needs-improvement',
+                      ? 'average'
+                      : 'needs-improvement',
             timeManagement: {
                 rating: 'average',
                 feedback:
@@ -616,7 +675,7 @@ Provide analysis in this JSON format:
     /**
      * AI-powered quiz moderation.
      * Returns { approved: boolean, reason: string, score: number (0-100) }
-     * 
+     *
      * Approves if:
      *  - Title and description are not offensive/irrelevant
      *  - Questions are coherent, educational, and have clearly correct answers
@@ -666,7 +725,8 @@ Approve (true) if score >= 60 and all content is safe. Reject (false) if score <
                 messages: [
                     {
                         role: 'system',
-                        content: 'You are a strict but fair quiz quality moderator. Respond only with valid JSON.',
+                        content:
+                            'You are a strict but fair quiz quality moderator. Respond only with valid JSON.',
                     },
                     { role: 'user', content: prompt },
                 ],
@@ -675,11 +735,11 @@ Approve (true) if score >= 60 and all content is safe. Reject (false) if score <
             });
 
             const content = completion.choices[0].message.content?.trim() || '';
-            
+
             // Extract JSON safely
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (!jsonMatch) throw new Error('No JSON in AI response');
-            
+
             const result = JSON.parse(jsonMatch[0]);
             return {
                 approved: Boolean(result.approved),
@@ -699,4 +759,3 @@ Approve (true) if score >= 60 and all content is safe. Reject (false) if score <
 }
 
 module.exports = new AIService();
-

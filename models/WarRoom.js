@@ -39,8 +39,8 @@ const warRoomSchema = new mongoose.Schema(
         },
         maxPlayers: {
             type: Number,
-            min: 2,
-            max: 10,
+            min: 1,
+            max: 25,
             default: 10,
         },
         members: [
@@ -135,7 +135,7 @@ const warRoomSchema = new mongoose.Schema(
             default: Date.now,
         },
     },
-    { timestamps: true }
+    { timestamps: true },
 );
 
 // Indexes
@@ -149,7 +149,7 @@ warRoomSchema.index(
     {
         expireAfterSeconds: 7200, // 2 hours idle → auto-close
         partialFilterExpression: { status: 'closed' },
-    }
+    },
 );
 
 // Virtual for player count

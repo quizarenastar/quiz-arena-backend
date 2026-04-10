@@ -33,6 +33,21 @@ const contactSchema = new mongoose.Schema(
             minlength: [10, 'Message must be at least 10 characters long'],
             maxlength: [1000, 'Message cannot exceed 1000 characters'],
         },
+        category: {
+            type: String,
+            enum: ['bug', 'feature', 'feedback', 'other'],
+            default: 'other',
+        },
+        pageUrl: {
+            type: String,
+            trim: true,
+            maxlength: [500, 'Page URL cannot exceed 500 characters'],
+        },
+        contactNumber: {
+            type: String,
+            trim: true,
+            maxlength: [20, 'Contact number cannot exceed 20 characters'],
+        },
         status: {
             type: String,
             enum: ['pending', 'in-progress', 'resolved'],
@@ -41,7 +56,7 @@ const contactSchema = new mongoose.Schema(
     },
     {
         timestamps: true,
-    }
+    },
 );
 
 const Contact = mongoose.model('Contact', contactSchema);

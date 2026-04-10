@@ -5,13 +5,24 @@ const contactController = {
     // Create a new contact message
     createContact: async (req, res) => {
         try {
-            const { name, email, subject, message } = req.body;
+            const {
+                name,
+                email,
+                subject,
+                message,
+                category,
+                pageUrl,
+                contactNumber,
+            } = req.body;
 
             const contact = new Contact({
                 name,
                 email,
                 subject,
                 message,
+                category,
+                pageUrl,
+                contactNumber,
             });
 
             await contact.save();

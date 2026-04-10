@@ -27,7 +27,9 @@ async function generateUniqueCode() {
 
     if (exists) {
         // Fallback to nanoid
-        code = nanoid(6).toUpperCase().replace(/[IO01]/g, 'X');
+        code = nanoid(6)
+            .toUpperCase()
+            .replace(/[IO01]/g, 'X');
     }
 
     return code;
@@ -45,12 +47,12 @@ exports.createRoom = async (req, res, next) => {
         if (!name || name.trim().length < 2) {
             return res.status(400).json({
                 success: false,
-                message: 'Room name must be at least 2 characters',
+                message: 'Room name must be at least 2 characters long',
             });
         }
 
         const user = await User.findById(req.userId).select(
-            'username profilePicture blocked'
+            'username profilePicture blocked',
         );
         if (!user) {
             return res.status(404).json({
@@ -86,7 +88,7 @@ exports.createRoom = async (req, res, next) => {
             roomCode,
             visibility: visibility || 'public',
             hostId: req.userId,
-            maxPlayers: Math.min(Math.max(maxPlayers || 10, 2), 10),
+            maxPlayers: Math.min(Math.max(maxPlayers || 10, 1), 25),
             members: [
                 {
                     userId: req.userId,
@@ -102,16 +104,16 @@ exports.createRoom = async (req, res, next) => {
                 difficulty: settings?.difficulty || 'medium',
                 totalQuestions: Math.min(
                     Math.max(settings?.totalQuestions || 10, 5),
-                    30
+                    30,
                 ),
                 timePerQuestion: Math.min(
                     Math.max(settings?.timePerQuestion || 30, 10),
-                    120
+                    120,
                 ),
                 category: settings?.category || 'general-knowledge',
                 countdownSeconds: Math.min(
                     Math.max(settings?.countdownSeconds || 10, 5),
-                    30
+                    30,
                 ),
             },
         });
@@ -141,7 +143,7 @@ exports.createRoom = async (req, res, next) => {
 exports.getSuggestedQuestions = async (req, res, next) => {
     try {
         const room = await WarRoom.findById(req.params.roomId).select(
-            'name description members status'
+            'name description members status',
         );
 
         if (!room) {
@@ -152,7 +154,7 @@ exports.getSuggestedQuestions = async (req, res, next) => {
         }
 
         const isMember = room.members.some(
-            (m) => m.userId.toString() === req.userId
+            (m) => m.userId.toString() === req.userId,
         );
         if (!isMember) {
             return res.status(403).json({
@@ -167,7 +169,7 @@ exports.getSuggestedQuestions = async (req, res, next) => {
 
         const topics = await aiService.generateTopicSuggestionsFromContext(
             contextTopic,
-            6
+            6,
         );
 
         res.json({
@@ -205,7 +207,7 @@ exports.getPublicRooms = async (req, res, next) => {
                 .skip(skip)
                 .limit(limit)
                 .select(
-                    'name description roomCode status maxPlayers members settings roundNumber lastActivityAt createdAt'
+                    'name description roomCode status maxPlayers members settings roundNumber lastActivityAt createdAt',
                 )
                 .lean(),
             WarRoom.countDocuments(filter),
@@ -270,7 +272,7 @@ exports.getRoomByCode = async (req, res, next) => {
         // For private rooms, only members can see details
         if (room.visibility === 'private') {
             const isMember = room.members.some(
-                (m) => m.userId.toString() === req.userId
+                (m) => m.userId.toString() === req.userId,
             );
             if (!isMember) {
                 // Return limited info for non-members
@@ -296,7 +298,7 @@ exports.getRoomByCode = async (req, res, next) => {
             data: {
                 ...room,
                 isMember: room.members.some(
-                    (m) => m.userId.toString() === req.userId
+                    (m) => m.userId.toString() === req.userId,
                 ),
             },
         });
@@ -331,7 +333,7 @@ exports.joinRoom = async (req, res, next) => {
         }
 
         const isMember = room.members.some(
-            (m) => m.userId.toString() === req.userId
+            (m) => m.userId.toString() === req.userId,
         );
         if (isMember) {
             return res.json({
@@ -349,7 +351,7 @@ exports.joinRoom = async (req, res, next) => {
         }
 
         const user = await User.findById(req.userId).select(
-            'username profilePicture blocked'
+            'username profilePicture blocked',
         );
         if (!user) {
             return res.status(404).json({
@@ -400,7 +402,7 @@ exports.leaveRoom = async (req, res, next) => {
         }
 
         const isMember = room.members.some(
-            (m) => m.userId.toString() === req.userId
+            (m) => m.userId.toString() === req.userId,
         );
         if (!isMember) {
             return res.status(400).json({
@@ -410,14 +412,11 @@ exports.leaveRoom = async (req, res, next) => {
         }
 
         room.members = room.members.filter(
-            (m) => m.userId.toString() !== req.userId
+            (m) => m.userId.toString() !== req.userId,
         );
 
         // Transfer host if needed
-        if (
-            room.hostId.toString() === req.userId &&
-            room.members.length > 0
-        ) {
+        if (room.hostId.toString() === req.userId && room.members.length > 0) {
             room.members[0].role = 'host';
             room.hostId = room.members[0].userId;
         }
@@ -498,7 +497,7 @@ exports.getRoomHistory = async (req, res, next) => {
         }
 
         const isMember = room.members.some(
-            (m) => m.userId.toString() === req.userId
+            (m) => m.userId.toString() === req.userId,
         );
         if (!isMember) {
             return res.status(403).json({
@@ -513,7 +512,7 @@ exports.getRoomHistory = async (req, res, next) => {
         })
             .sort({ roundNumber: -1 })
             .select(
-                'roundNumber topic difficulty totalQuestions results winnerId startedAt endedAt'
+                'roundNumber topic difficulty totalQuestions results winnerId startedAt endedAt',
             )
             .lean();
 
