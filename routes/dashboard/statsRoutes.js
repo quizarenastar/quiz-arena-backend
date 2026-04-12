@@ -19,5 +19,9 @@ router.get('/', statsController.getDashboardStats);
 
 // Analytics routes
 router.get('/analytics/quiz', statsController.getQuizAnalytics);
+router.get('/analytics/user-growth', statsController.getUserGrowthStats);
+router.get('/analytics/category-participation', statsController.getCategoryParticipation);
+router.get('/analytics/anti-cheat', statsController.getAntiCheatStats);
+router.get('/analytics/revenue-distribution', statsController.getRevenueDistribution);
 
 module.exports = router;
