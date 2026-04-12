@@ -16,6 +16,7 @@ exports.adminFilterSchema = Joi.object({
     status: Joi.string()
         .valid('pending', 'approved', 'rejected', 'all')
         .optional(),
+    isPaid: Joi.string().valid('true', 'false').optional(),
     category: Joi.string()
         .valid(
             'technology',
@@ -26,7 +27,7 @@ exports.adminFilterSchema = Joi.object({
             'entertainment',
             'literature',
             'mathematics',
-            'general-knowledge'
+            'general-knowledge',
         )
         .optional(),
 });

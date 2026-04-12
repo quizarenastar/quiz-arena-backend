@@ -39,7 +39,7 @@ class quizController {
                         timeLimit: quiz.duration || 30,
                         attemptCount: quiz.analytics?.totalAttempts || 0,
                     };
-                })
+                }),
             );
 
             res.json({
@@ -70,12 +70,17 @@ class quizController {
             const page = parseInt(req.query.page) || 1;
             const limit = parseInt(req.query.limit) || 10;
             const skip = (page - 1) * limit;
-            const { status, category, search } = req.query;
+            const { status, category, search, isPaid } = req.query;
 
             // Build filter
             const filter = {};
             if (status && status !== 'all') {
                 filter.status = status;
+            }
+            if (isPaid === 'true') {
+                filter.isPaid = true;
+            } else if (isPaid === 'false') {
+                filter.isPaid = false;
             }
             if (category) {
                 filter.category = category;
@@ -118,7 +123,7 @@ class quizController {
                         timeLimit: quiz.duration || 30,
                         attemptCount: quiz.analytics?.totalAttempts || 0,
                     };
-                })
+                }),
             );
 
             res.json({
@@ -294,7 +299,7 @@ class quizController {
 
             // Send notification to creator (you can implement email service here)
             console.log(
-                `Quiz ${quiz.title} rejected by admin ${adminId}: ${reason}`
+                `Quiz ${quiz.title} rejected by admin ${adminId}: ${reason}`,
             );
 
             res.json({
@@ -341,7 +346,7 @@ class quizController {
 
             // Log deletion
             console.log(
-                `Quiz ${quiz.title} deleted by admin ${req.user.id}: ${reason}`
+                `Quiz ${quiz.title} deleted by admin ${req.user.id}: ${reason}`,
             );
 
             res.json({
@@ -408,7 +413,9 @@ class quizController {
                 // Process refunds
                 for (const transaction of paidTransactions) {
                     try {
-                        const user = await User.findById(transaction.userId._id);
+                        const user = await User.findById(
+                            transaction.userId._id,
+                        );
                         const balanceBefore = user?.wallet?.balance || 0;
 
                         // Create refund transaction
@@ -440,7 +447,7 @@ class quizController {
                     } catch (refundError) {
                         console.error(
                             `Failed to refund user ${transaction.userId._id}:`,
-                            refundError
+                            refundError,
                         );
                         // Continue with other refunds even if one fails
                     }
@@ -451,7 +458,7 @@ class quizController {
             console.log(
                 `Quiz "${quiz.title}" cancelled by admin ${adminId}. ` +
                     `Reason: ${reason}. ` +
-                    `Refunds processed: ${refundCount}, Total refunded: ${totalRefunded}`
+                    `Refunds processed: ${refundCount}, Total refunded: ${totalRefunded}`,
             );
 
             res.json({
@@ -474,6 +481,181 @@ class quizController {
                     process.env.NODE_ENV === 'development'
                         ? error.message
                         : undefined,
+            });
+        }
+    }
+    // Get full quiz detail with attempts, registrations, winners
+    async getQuizFullDetail(req, res) {
+        try {
+            const { quizId } = req.params;
+
+            const quiz = await Quiz.findById(quizId)
+                .populate('creatorId', 'username email analytics')
+                .populate(
+                    'participantManagement.registeredUsers.userId',
+                    'username email',
+                )
+                .populate('prizePool.winners.userId', 'username email')
+                .populate('approvedBy', 'username email')
+                .populate('cancelledBy', 'username email')
+                .lean();
+
+            if (!quiz) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Quiz not found',
+                });
+            }
+
+            // Get questions
+            const questions = await Question.find({ quizId }).lean();
+
+            // Get all attempts with user info
+            const attempts = await QuizAttempt.find({ quizId })
+                .populate('userId', 'username email')
+                .sort({ score: -1, duration: 1 })
+                .lean();
+
+            // Get transactions related to this quiz
+            const transactions = await Transaction.find({
+                relatedQuizId: quizId,
+            })
+                .populate('userId', 'username email')
+                .sort({ createdAt: -1 })
+                .lean();
+
+            const formattedQuiz = {
+                ...quiz,
+                questions,
+                creator: {
+                    _id: quiz.creatorId?._id,
+                    name: quiz.creatorId?.username || 'Unknown',
+                    email: quiz.creatorId?.email || '',
+                },
+                timeLimit: quiz.duration || 30,
+                attemptCount: quiz.analytics?.totalAttempts || 0,
+            };
+
+            res.json({
+                success: true,
+                data: {
+                    quiz: formattedQuiz,
+                    attempts,
+                    transactions,
+                },
+            });
+        } catch (error) {
+            console.error('Get quiz full detail error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to fetch quiz details',
+            });
+        }
+    }
+
+    // Revoke a winner's reward
+    async revokeReward(req, res) {
+        try {
+            const { quizId } = req.params;
+            const { userId, reason } = req.body;
+            const adminId = req.user.id;
+
+            if (!userId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'userId is required',
+                });
+            }
+
+            if (!reason || reason.trim().length < 10) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Reason must be at least 10 characters',
+                });
+            }
+
+            const quiz = await Quiz.findById(quizId);
+            if (!quiz) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Quiz not found',
+                });
+            }
+
+            // Find the winner entry
+            const winnerIndex = quiz.prizePool.winners.findIndex(
+                (w) => w.userId.toString() === userId,
+            );
+
+            if (winnerIndex === -1) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User is not a winner in this quiz',
+                });
+            }
+
+            const winner = quiz.prizePool.winners[winnerIndex];
+            const prizeAmount = winner.prize;
+
+            // Find the user and deduct from wallet
+            const user = await User.findById(userId);
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found',
+                });
+            }
+
+            const balanceBefore = user.wallet?.balance || 0;
+
+            // Create penalty transaction
+            const penaltyTransaction = new Transaction({
+                userId,
+                relatedQuizId: quizId,
+                amount: prizeAmount,
+                type: 'penalty',
+                status: 'completed',
+                description: `Prize revoked for quiz: ${quiz.title}. Reason: ${reason}`,
+                paymentMethod: 'wallet',
+                balanceBefore,
+                balanceAfter: balanceBefore - prizeAmount,
+                metadata: {
+                    revokedBy: adminId,
+                    reason,
+                    originalRank: winner.rank,
+                },
+            });
+            await penaltyTransaction.save();
+
+            // Deduct from user wallet
+            await User.findByIdAndUpdate(userId, {
+                $inc: {
+                    'wallet.balance': -prizeAmount,
+                    'wallet.totalEarned': -prizeAmount,
+                },
+            });
+
+            // Remove winner from quiz
+            quiz.prizePool.winners.splice(winnerIndex, 1);
+            await quiz.save();
+
+            console.log(
+                `Prize ₹${prizeAmount} revoked from user ${userId} for quiz "${quiz.title}" by admin ${adminId}. Reason: ${reason}`,
+            );
+
+            res.json({
+                success: true,
+                message: `Prize of ₹${prizeAmount} revoked successfully`,
+                data: {
+                    revokedAmount: prizeAmount,
+                    transactionId: penaltyTransaction._id,
+                },
+            });
+        } catch (error) {
+            console.error('Revoke reward error:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Failed to revoke reward',
             });
         }
     }
