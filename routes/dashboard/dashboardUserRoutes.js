@@ -5,8 +5,15 @@ const {
     signIn,
     getAllDashboardUsers,
     getAllUsers,
+    getUserDetail,
+    giveBonusToUser,
+    giveBonusToAllUsers,
 } = require('../../controllers/dashboard/dashboardUserController');
-const { validate } = require('../../middlewares/validate');
+const {
+    validate,
+    validateMongoId,
+    validateBody,
+} = require('../../middlewares/validate');
 const {
     dashboardUserSchemaLogin,
     dashboardUserSchemaSignup,
@@ -23,13 +30,36 @@ router.get(
     '/dashboardUserlist',
     verifyDashboardUser,
     requireRole(['Admin']),
-    getAllDashboardUsers
+    getAllDashboardUsers,
 );
 router.get(
     '/userlist',
     verifyDashboardUser,
     requireRole(['Admin']),
-    getAllUsers
+    getAllUsers,
+);
+
+router.get(
+    '/userlist/:userId',
+    verifyDashboardUser,
+    requireRole(['Admin']),
+    validateMongoId('userId'),
+    getUserDetail,
+);
+
+router.post(
+    '/userlist/:userId/bonus',
+    verifyDashboardUser,
+    requireRole(['Admin']),
+    validateMongoId('userId'),
+    giveBonusToUser,
+);
+
+router.post(
+    '/bonus-all',
+    verifyDashboardUser,
+    requireRole(['Admin']),
+    giveBonusToAllUsers,
 );
 
 module.exports = router;
