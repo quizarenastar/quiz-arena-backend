@@ -12,9 +12,7 @@ const {
 
 const { adminFilterSchema } = require('../../validation/commonValidations');
 
-const {
-    cancelQuizSchema,
-} = require('../../validation/quizValidation');
+const { cancelQuizSchema } = require('../../validation/quizValidation');
 
 const { approveRejectSchema } = require('../../validation/commonValidations');
 
@@ -25,46 +23,58 @@ router.use(verifyDashboardUser);
 router.get(
     '/',
     validateQuery(adminFilterSchema),
-    adminController.getAllQuizzes
+    adminController.getAllQuizzes,
 );
 
 router.get(
     '/pending',
     validateQuery(adminFilterSchema),
-    adminController.getPendingQuizzes
+    adminController.getPendingQuizzes,
 );
 
 router.get(
     '/:quizId/review',
     validateMongoId('quizId'),
-    adminController.getQuizForReview
+    adminController.getQuizForReview,
+);
+
+router.get(
+    '/:quizId/detail',
+    validateMongoId('quizId'),
+    adminController.getQuizFullDetail,
 );
 
 router.post(
     '/:quizId/approve',
     validateMongoId('quizId'),
     validateBody(approveRejectSchema),
-    adminController.approveQuiz
+    adminController.approveQuiz,
 );
 
 router.post(
     '/:quizId/reject',
     validateMongoId('quizId'),
     validateBody(approveRejectSchema),
-    adminController.rejectQuiz
+    adminController.rejectQuiz,
 );
 
 router.delete(
     '/:quizId',
     validateMongoId('quizId'),
-    adminController.deleteQuiz
+    adminController.deleteQuiz,
 );
 
 router.post(
     '/:quizId/cancel',
     validateMongoId('quizId'),
     validateBody(cancelQuizSchema),
-    adminController.cancelQuiz
+    adminController.cancelQuiz,
+);
+
+router.post(
+    '/:quizId/revoke-reward',
+    validateMongoId('quizId'),
+    adminController.revokeReward,
 );
 
 module.exports = router;
