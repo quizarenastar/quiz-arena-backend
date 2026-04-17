@@ -1,6 +1,8 @@
 const cron = require('node-cron');
 const Quiz = require('../models/Quiz');
+const User = require('../models/User');
 const prizeDistributionService = require('./prizeDistributionService');
+const { sendQuizStartedEmail, sendQuizCancelledEmail } = require('./emailService');
 
 class CronScheduler {
     constructor() {
@@ -9,8 +11,8 @@ class CronScheduler {
 
     /**
      * Check quizzes at their start time
-     * - If participant count < 5: Cancel quiz and refund
-     * - If participant count >= 5: Set status to 'active'
+     * - If participant count < 5: Cancel quiz, refund, and notify users
+     * - If participant count >= 5: Mark as checked and notify users
      * Runs every minute
      */
     startQuizStartTimeChecker() {
@@ -44,6 +46,11 @@ class CronScheduler {
                         `[CRON] Quiz "${quiz.title}": ${participantCount}/${minParticipants} participants`,
                     );
 
+                    // Get all registered user emails for notifications
+                    const registeredUserIds = quiz.participantManagement.registeredUsers
+                        .filter((r) => r.status === 'paid')
+                        .map((r) => r.userId);
+
                     if (participantCount < minParticipants) {
                         // Cancel and refund
                         console.log(
@@ -55,6 +62,28 @@ class CronScheduler {
                                 `Cancelled: Only ${participantCount} participant(s) registered (minimum ${minParticipants} required)`,
                             );
                         console.log(`[CRON] Cancellation result:`, result);
+
+                        // Send cancellation emails to all registered users
+                        if (registeredUserIds.length > 0) {
+                            try {
+                                const users = await User.find({ _id: { $in: registeredUserIds } }).select('email');
+                                for (const u of users) {
+                                    sendQuizCancelledEmail(u.email, {
+                                        quizTitle: quiz.title,
+                                        quizId: quiz._id,
+                                        refundAmount: quiz.price,
+                                        reason: `Only ${participantCount} participant(s) registered (minimum ${minParticipants} required)`,
+                                        participantCount,
+                                        minParticipants,
+                                    });
+                                }
+                                console.log(
+                                    `[CRON] Sent quiz-cancelled emails to ${users.length} participants for "${quiz.title}"`,
+                                );
+                            } catch (err) {
+                                console.error('[CRON] Failed to send quiz-cancelled emails:', err.message);
+                            }
+                        }
                     } else {
                         // Mark as checked (quiz can proceed)
                         console.log(
@@ -63,6 +92,31 @@ class CronScheduler {
                         quiz.autoCancel.checked = true;
                         quiz.autoCancel.checkedAt = now;
                         await quiz.save();
+
+                        // Send "quiz started" email to all registered users
+                        if (registeredUserIds.length > 0) {
+                            try {
+                                const users = await User.find({ _id: { $in: registeredUserIds } }).select('email');
+                                console.log(
+                                    `[CRON] Sending quiz-started emails to ${users.length} participants for "${quiz.title}"`,
+                                );
+                                for (const u of users) {
+                                    sendQuizStartedEmail(u.email, {
+                                        quizTitle: quiz.title,
+                                        quizId: quiz._id,
+                                        duration: quiz.duration,
+                                        totalQuestions: quiz.totalQuestions,
+                                    });
+                                }
+                                console.log(
+                                    `[CRON] Quiz-started emails dispatched for "${quiz.title}"`,
+                                );
+                            } catch (err) {
+                                console.error('[CRON] Failed to send quiz-started emails:', err.message);
+                            }
+                        } else {
+                            console.log(`[CRON] No registered users found for quiz "${quiz.title}" — skipping emails`);
+                        }
                     }
                 }
             } catch (error) {
