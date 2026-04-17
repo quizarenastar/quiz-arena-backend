@@ -6,6 +6,7 @@ const Transaction = require('../../models/Transaction');
 const AIService = require('../../services/aiService');
 const AntiCheatService = require('../../services/antiCheatService');
 const prizeDistributionService = require('../../services/prizeDistributionService');
+const { sendQuizRegistrationEmail } = require('../../services/emailService');
 const mongoose = require('mongoose');
 
 class QuizController {
@@ -475,6 +476,15 @@ class QuizController {
             });
 
             await session.endSession();
+
+            // Send registration receipt email (fire-and-forget)
+            sendQuizRegistrationEmail(user.email, {
+                quizTitle: quiz.title,
+                amount: quiz.price,
+                startTime: quiz.startTime,
+                transactionId: transaction._id,
+                participantCount: quiz.participantManagement.participantCount,
+            });
 
             res.json({
                 success: true,

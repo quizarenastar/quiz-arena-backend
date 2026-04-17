@@ -146,6 +146,7 @@ app.use('/dashboard/v1/stats', require('./routes/dashboard/statsRoutes'));
 app.use('/dashboard/v1/quizzes', require('./routes/dashboard/quizRoutes'));
 app.use('/dashboard/v1/wallet', require('./routes/dashboard/walletRoutes'));
 app.use('/dashboard/v1/war-rooms', require('./routes/dashboard/warRoomRoutes'));
+app.use('/dashboard/v1/emails', require('./routes/dashboard/emailRoutes'));
 
 // 404 handler (Express 5: use a regex-style catch-all)
 app.use((req, res, next) => {
