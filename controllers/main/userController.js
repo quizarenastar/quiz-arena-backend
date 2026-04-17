@@ -1,8 +1,11 @@
 const Client = require('../../models/User.js');
+const Otp = require('../../models/Otp.js');
 const bcryptjs = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { sendSuccess, sendError } = require('../../utils/sendResponse.js');
 const { JWT_SECRET, expiryDate } = require('../../configs/index.js');
+const { sendOtpEmail } = require('../../services/emailService.js');
 
 const generateUniqueUsername = async (baseUsername) => {
     let username = baseUsername;
@@ -16,10 +19,103 @@ const generateUniqueUsername = async (baseUsername) => {
     return username;
 };
 
-module.exports.signup = async (req, res) => {
-    const { username, email, password } = req.body;
+/**
+ * Step 1 — Send OTP to the user's email.
+ * POST /api/v1/users/send-otp
+ * Body: { email, username (optional), password }
+ */
+module.exports.sendOtp = async (req, res) => {
+    const { email, username } = req.body;
 
-    // Check if email already exists
+    if (!email) {
+        return sendError(res, 'Email is required', 400);
+    }
+
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return sendError(res, 'Please enter a valid email address', 400);
+    }
+
+    // Check if email already registered
+    const existingUser = await Client.findOne({ email });
+    if (existingUser) {
+        return sendError(res, 'User already exists with this email', 402);
+    }
+
+    // Check if username already taken (if provided)
+    if (username) {
+        const existingUsername = await Client.findOne({
+            username: username.toLowerCase(),
+        });
+        if (existingUsername) {
+            return sendError(res, 'Username is already taken', 402);
+        }
+    }
+
+    // Rate limit: prevent OTP spam — check if an OTP was sent within last 60 seconds
+    const recentOtp = await Otp.findOne({
+        email,
+        createdAt: { $gt: new Date(Date.now() - 60 * 1000) },
+    });
+    if (recentOtp) {
+        return sendError(
+            res,
+            'OTP already sent. Please wait 60 seconds before requesting again.',
+            429
+        );
+    }
+
+    // Generate 6-digit OTP
+    const otpCode = crypto.randomInt(100000, 999999).toString();
+
+    // Hash OTP before storing
+    const hashedOtp = await bcryptjs.hash(otpCode, 10);
+
+    // Delete any previous OTPs for this email
+    await Otp.deleteMany({ email });
+
+    // Store new OTP
+    await Otp.create({ email, otp: hashedOtp });
+
+    // Send email
+    try {
+        await sendOtpEmail(email, otpCode);
+    } catch (err) {
+        return sendError(res, 'Failed to send verification email. Please try again.', 500);
+    }
+
+    return sendSuccess(res, {}, 'OTP sent to your email', 200);
+};
+
+/**
+ * Step 2 — Verify OTP and create the user account.
+ * POST /api/v1/users/signup
+ * Body: { email, otp, username, password }
+ */
+module.exports.signup = async (req, res) => {
+    const { username, email, password, otp } = req.body;
+
+    if (!email || !otp || !password) {
+        return sendError(res, 'Email, OTP, and password are required', 400);
+    }
+
+    // Find the latest OTP for this email
+    const otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
+    if (!otpRecord) {
+        return sendError(res, 'OTP expired or not found. Please request a new one.', 400);
+    }
+
+    // Verify OTP
+    const isMatch = await bcryptjs.compare(otp, otpRecord.otp);
+    if (!isMatch) {
+        return sendError(res, 'Invalid OTP. Please try again.', 400);
+    }
+
+    // OTP verified — delete it
+    await Otp.deleteMany({ email });
+
+    // Check if email already exists (race condition guard)
     const existingUser = await Client.findOne({ email });
     if (existingUser) {
         return sendError(res, 'User already exists with this email', 402);

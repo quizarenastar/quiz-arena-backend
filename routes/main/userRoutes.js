@@ -4,6 +4,7 @@ const router = express.Router();
 const {
     signin,
     signup,
+    sendOtp,
     google,
     getProfile,
     updateProfile,
@@ -11,6 +12,7 @@ const {
 } = require('../../controllers/main/userController');
 const verifyUser = require('../../middlewares/verifyUser');
 
+router.post('/send-otp', sendOtp);
 router.post('/signup', signup);
 router.post('/login', signin);
 router.post('/google', google);
